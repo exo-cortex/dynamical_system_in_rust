@@ -1,0 +1,9 @@
+# taken from here: https://stackoverflow.com/a/43667316/11305417 
+
+# Generated files
+/target/
+
+# The library shouldn't decide about the exact versions of 
+# its dependencies, but let the downstream crate decide.
+Cargo.lock
+*.txt
