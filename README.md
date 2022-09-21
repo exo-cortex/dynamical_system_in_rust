@@ -1,4 +1,4 @@
-# a dynamical system's integration program written in Rust.
+# A programm to integrate dynamical systems written in Rust.
 
 This Program is mainly for learning Rust. Right now it can only integrate the Lorenz system, write out the dynamical variables and plot with the help of a python script.
 
