@@ -14,7 +14,29 @@ pub struct Model {
     pub rho: f64,
 }
 
-fn f(input: &State, p: &Model) -> State {
+#[allow(dead_code)]
+impl Model {
+    pub fn ff(&self, input: &State) -> State {
+        State {
+            x: self.sigma * (input.y - input.x),
+            y: input.x * (self.rho - input.z) - input.y,
+            z: input.x * input.y - self.beta * input.z,
+        }
+    }
+
+    // pub fn update_rk4(&mut self) {
+    //     pub fn update_rk4_with_f(f: fn(&State) -> State, state: &mut State, dt: f64) {
+    //         // runge kutta 4 method creates 4 "helper steps"
+    //         let k1 = f(state);
+    //         let k2 = f(&(*state + k1 * 0.5 * dt));
+    //         let k3 = f(&(*state + k2 * 0.5 * dt));
+    //         let k4 = f(&(*state + k3 * dt));
+    //         *state += (k1 + k2 * 2.0 + k3 * 2.0 + k4) / 6.0 * dt;
+    //     }
+    // }
+}
+
+pub fn f(input: &State, p: &Model) -> State {
     // f as in { z'(t) = f(z(t), t) }
     State {
         x: p.sigma * (input.y - input.x),
@@ -30,6 +52,17 @@ pub fn update_rk4(state: &mut State, p: &Model, dt: f64) {
     let k2 = f(&(*state + k1 * 0.5 * dt), p);
     let k3 = f(&(*state + k2 * 0.5 * dt), p);
     let k4 = f(&(*state + k3 * dt), p);
+
+    *state += (k1 + k2 * 2.0 + k3 * 2.0 + k4) / 6.0 * dt;
+}
+
+#[allow(dead_code)]
+pub fn update_rk4_with_f(f: fn(&State) -> State, state: &mut State, dt: f64) {
+    // runge kutta 4 method creates 4 "helper steps"
+    let k1 = f(state);
+    let k2 = f(&(*state + k1 * 0.5 * dt));
+    let k3 = f(&(*state + k2 * 0.5 * dt));
+    let k4 = f(&(*state + k3 * dt));
 
     *state += (k1 + k2 * 2.0 + k3 * 2.0 + k4) / 6.0 * dt;
 }
