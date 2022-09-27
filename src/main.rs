@@ -1,36 +1,41 @@
 // mod analysis;
 mod curve_simplification;
+mod lang_kobayashi;
 mod lorenz;
 
+// experimental
+mod integrator;
+
+use num_complex::Complex;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 
 fn main() -> std::io::Result<()> {
-	let mut state: lorenz::State = lorenz::State {
-		x: 1.0,
-		y: 1.0,
-		z: 1.0,
+	let mut state: lang_kobayashi::State = lang_kobayashi::State {
+		e: Complex::new(0.1, 0.0),
+		n: -0.1,
 	};
 
-	let parameters: lorenz::Model = lorenz::Model {
-		sigma: 10.0,
-		rho: 28.0,
-		beta: 8.0 / 3.0,
+	let parameters: lang_kobayashi::Model = lang_kobayashi::Model {
+		alpha: 0.05,
+		pump: 0.25,
+		t_lk: 1000.0,
 	};
 
-	let segment_size = 1024;
-	let segments = 100;
-	let dt = 1.0 / 2.0f64.powi(10);
-	let epsilon = 0.00001;
+	let segment_size = 4096 * 16;
+	let segments = 8;
+	let mut segment = vec![vec![0.0; 3]; segment_size];
+
+	let dt = 1e-2;
+	let epsilon = 1e-14;
 	let mut time: f64 = 0.0;
-	let mut outfile = BufWriter::new(File::create("lorenz_data_rk4.txt").unwrap());
+	let mut outfile = BufWriter::new(File::create("data.txt").unwrap());
 
-	let mut segment = vec![vec![0.0; 4]; segment_size];
 	for _ in 0..segments {
 		for i in 0..segment_size {
+			segment[i] = vec![time, state.e.norm_sqr(), state.n];
 			time += dt;
-			lorenz::update_rk4(&mut state, &parameters, dt);
-			segment[i] = vec![time, state.x, state.y, state.z];
+			integrator::update_runge_kutte_4(&mut state, &parameters, dt, lang_kobayashi::f);
 		}
 		curve_simplification::simplified_write(&segment, epsilon, &mut outfile);
 	}
