@@ -44,7 +44,7 @@ pub fn distance_point_to_line_squared(a: &Vec<f64>, b: &Vec<f64>, point: &Vec<f6
 // assumption: a timeseries has x values in an ascending, equidistant order
 
 pub fn simplified_write(curve: &Vec<Vec<f64>>, epsilon: f64, outfile: &mut BufWriter<File>) {
-	simplify_parametric_curve(curve, 0, curve.len() - 1, epsilon.sqrt(), outfile);
+	simplify_parametric_curve(curve, 0, curve.len() - 1, epsilon.powi(2), outfile);
 	write_row(outfile, curve.last().unwrap());
 }
 
@@ -89,7 +89,7 @@ pub fn simplified_subset_timeseries(
 			&indices,
 			0,
 			curve.len() - 1,
-			epsilon.sqrt(),
+			epsilon.powi(2),
 			&mut outfiles[i],
 		);
 		write_row(&mut outfiles[i], curve.last().unwrap());
@@ -106,9 +106,10 @@ fn simplify_subset_curve(
 	outfile: &mut BufWriter<File>,
 ) {
 	let mut max_sqr_distance = 0.0;
-	let mut index_of_max: usize = first + 1;
+	let mut index_of_max = first + 1;
 	let a = vec![curve[first][indices[0]], curve[first][indices[1]]];
 	let b = vec![curve[last][indices[0]], curve[last][indices[1]]];
+	// here cargo clippy makes a suggestion
 	for i in first + 1..last {
 		let point = vec![curve[i][indices[0]], curve[i][indices[1]]];
 		let sqr_d = distance_point_to_line_squared(&a, &b, &point);
@@ -126,8 +127,8 @@ fn simplify_subset_curve(
 }
 
 fn write_row(outfile: &mut BufWriter<File>, values: &[f64]) {
-	for i in 0..values.len() - 1 {
-		let value_string = format!("{:.20}\t", &values[i]);
+	for value in values.iter().take(values.len() - 1) {
+		let value_string = format!("{:.20}\t", value);
 		write!(outfile, "{}", value_string).unwrap();
 	}
 	let value_string = format!("{:.20}\n", &values.last().unwrap());
