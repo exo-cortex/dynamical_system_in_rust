@@ -43,9 +43,9 @@ pub fn distance_point_to_line_squared(a: &Vec<f64>, b: &Vec<f64>, point: &Vec<f6
 // do rdp (ramer-douglas-peucker) curve simplification
 // assumption: a timeseries has x values in an ascending, equidistant order
 
-pub fn simplified_write(curve: &Vec<Vec<f64>>, epsilon: f64, outfile: &mut BufWriter<File>) -> () {
+pub fn simplified_write(curve: &Vec<Vec<f64>>, epsilon: f64, outfile: &mut BufWriter<File>) {
 	simplify_parametric_curve(curve, 0, curve.len() - 1, epsilon.sqrt(), outfile);
-	write_row(outfile, &curve.last().unwrap());
+	write_row(outfile, curve.last().unwrap());
 }
 
 // simplify one n-dimensional curve, use n-dimensional point-to-line-distance
@@ -66,13 +66,11 @@ fn simplify_parametric_curve(
 		}
 	}
 	if max_sqr_distance > epsilon_square {
-		simplify_parametric_curve(&curve, first, index_of_max, epsilon_square, outfile);
-		simplify_parametric_curve(&curve, index_of_max, last, epsilon_square, outfile);
-		return;
+		simplify_parametric_curve(curve, first, index_of_max, epsilon_square, outfile);
+		simplify_parametric_curve(curve, index_of_max, last, epsilon_square, outfile);
 	} else {
 		write_row(outfile, &curve[index_of_max]);
 	}
-	return;
 }
 
 // this shall be used to simplify (and write out) individual timeseries for each dynamic variable
@@ -82,8 +80,8 @@ fn simplify_parametric_curve(
 pub fn simplified_subset_timeseries(
 	curve: &Vec<Vec<f64>>,
 	epsilon: f64,
-	outfiles: &mut Vec<BufWriter<File>>,
-) -> () {
+	outfiles: &mut [BufWriter<File>],
+) {
 	for i in 1..curve[0].len() {
 		let indices = vec![0, i];
 		simplify_subset_curve(
@@ -94,14 +92,14 @@ pub fn simplified_subset_timeseries(
 			epsilon.sqrt(),
 			&mut outfiles[i],
 		);
-		write_row(&mut outfiles[i], &curve.last().unwrap());
+		write_row(&mut outfiles[i], curve.last().unwrap());
 	}
 }
 
 #[allow(dead_code)]
 fn simplify_subset_curve(
 	curve: &Vec<Vec<f64>>,
-	indices: &Vec<usize>, // can only have 2 values (right now)
+	indices: &[usize], // can only have 2 values (right now)
 	first: usize,
 	last: usize,
 	epsilon_square: f64,
@@ -120,13 +118,11 @@ fn simplify_subset_curve(
 		}
 	}
 	if max_sqr_distance > epsilon_square {
-		simplify_parametric_curve(&curve, first, index_of_max, epsilon_square, outfile);
-		simplify_parametric_curve(&curve, index_of_max, last, epsilon_square, outfile);
-		return;
+		simplify_parametric_curve(curve, first, index_of_max, epsilon_square, outfile);
+		simplify_parametric_curve(curve, index_of_max, last, epsilon_square, outfile);
 	} else {
 		write_row(outfile, &curve[index_of_max]);
 	}
-	return;
 }
 
 fn write_row(outfile: &mut BufWriter<File>, values: &[f64]) {

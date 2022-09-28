@@ -32,8 +32,8 @@ fn main() -> std::io::Result<()> {
 	let mut outfile = BufWriter::new(File::create("data.txt").unwrap());
 
 	for _ in 0..segments {
-		for i in 0..segment_size {
-			segment[i] = vec![time, state.e.norm_sqr(), state.n];
+		for row in segment.iter_mut().take(segment_size) {
+			*row = vec![time, state.e.norm_sqr(), state.n];
 			time += dt;
 			integrator::update_runge_kutte_4(&mut state, &parameters, dt, lang_kobayashi::f);
 		}

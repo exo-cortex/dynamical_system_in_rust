@@ -8,3 +8,8 @@ edition = "2021"
 [dependencies]
 derive_more = "0.99.0"
 num-complex = "0.4.2"
+
+[profile.release]
+strip = true
+lto = true
+opt-level = "z"  # Optimize for size
