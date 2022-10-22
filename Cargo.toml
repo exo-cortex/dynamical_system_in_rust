@@ -6,10 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ringbuffer = "0.8.5"
 derive_more = "0.99.0"
 num-complex = "0.4.2"
+rand = { version = "0.8.5", features = [ "small_rng" ] }
 
 [profile.release]
-strip = true
-lto = true
-opt-level = "z"  # Optimize for size
+# strip = true
+# lto = true
+# opt-level = "s"  # Optimize for size

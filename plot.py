@@ -2,22 +2,25 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
+import glob
 
-file_rk4 = np.loadtxt("data.txt")
+# plt.rcParams.update({
+#     "text.usetex": True,
+#     "font.family": "sans-serif",
+#     "font.sans-serif": "Helvetica",
+#     "font.size" : 18,
+# })
 
-# timesieries plots
-t = 0 # can be 1,2,3,4
+colors = plt.rcParams["axes.prop_cycle"]()
 
-fig, ax1 = plt.subplots()
-ax1color=(1,0,0,0.5)
-ax1.plot(file_rk4[:,t], file_rk4[:,1], "-", ms=3.5, linewidth=1.25, color=ax1color)
-ax1.set_ylabel("|e|(t)", color=ax1color)
-ax1.tick_params(axis='y', labelcolor=ax1color)
-ax2 = ax1.twinx()
-ax2color=(0,0,1,0.5)
-ax2.plot(file_rk4[:,t], file_rk4[:,2], "-", ms=3.5, linewidth=1.25, color=ax2color)
-ax2.set_ylabel("n(t)", color = ax2color)
-ax2.tick_params(axis='y', labelcolor=ax2color)
+filenames = glob.glob("data_*.txt")
+print(filenames)
+files = [np.loadtxt(filename) for filename in filenames]
 
-plt.title("{} data points".format(np.shape(file_rk4)[0]))
+for i, f in enumerate(files):
+    print("data_dimensions: {}".format(np.shape(f)))
+    c = next(colors)["color"]
+    plt.plot(f[:,0], f[:,1] + i * 3, "-", ms=3.5, linewidth=1.25, color=c , label="e_{}".format(i))
+
+plt.legend()
 plt.show()
