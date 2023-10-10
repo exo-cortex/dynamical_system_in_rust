@@ -1,57 +1,91 @@
-// idea: define the dynamical system interface
-// new dynamical systems must implement it in order to work with the rest
-
-// 1. without delay
-pub trait DynamicalSystem<S, M>
-where
-    S: Sized
-        + Copy
-        + std::ops::Mul<f64, Output = S>
-        + std::ops::Add<S, Output = S>
-        + std::ops::AddAssign
-        + std::ops::Div<f64, Output = S>,
-{
-    fn f(state: &S, model: &M) -> S;
-}
+// use crate::global_parameter_map::GlobalParameterMap;
+use crate::network::Edge;
+// use num_complex;
+use std::f64::consts::PI;
+use std::fmt::Display;
 
 // 2. with delay
-pub trait DynamicalDelaySystem<S, M, D>
-where
-    S: Sized
-        + Copy
-        + std::ops::Mul<f64, Output = S>
-        + std::ops::Add<S, Output = S>
-        + std::ops::AddAssign
-        + std::ops::Div<f64, Output = S>,
-    D: Sized
-        + Clone
-        + Copy
-        + std::ops::Add<Output = D>
-        + std::ops::Sub<Output = D>
-        + std::ops::Mul<f64, Output = D>,
-{
-    fn f(state: &S, model: &M, delay: &D) -> S;
-    // from the systems's set of dynamical variables get the subset needed as delay.
-    fn keep_delay(state: &S) -> D;
+// delay systems must implement
+// StateT = state: contains the dynamic variables
+// ModelT = model: contains the parameters
+// FeedbackT = delay: a delay system has to `keep` some derived quantity of `state` for delayed feedback
+// WeightT = weight: the delay will likely be used as feedback in a weighted sum
+// KeepT: some object that can be "collected"
+
+// pub trait State:
+//     Sized
+//     + Clone
+//     + Copy
+//     + Default
+//     + Display
+//     + std::ops::Mul<f64, Output = Self>
+//     + std::ops::Add<Self, Output = Self>
+//     + std::ops::AddAssign
+//     + std::ops::Div<f64, Output = Self>
+// {
+// }
+
+pub trait IntoString {
+    fn write_out(&self) -> String;
 }
 
-// 3. driven dynamical system
-// prototype
-pub trait DrivenDynamicalDelaySystem<S, M, D, I>
-where
-    S: Sized
-        + Copy
-        + std::ops::Mul<f64, Output = S>
-        + std::ops::Add<S, Output = S>
-        + std::ops::AddAssign
-        + std::ops::Div<f64, Output = S>,
-    D: Sized
+pub trait DynamicalSystem {
+    type StateT: Sized
         + Clone
         + Copy
-        + std::ops::Add<Output = D>
-        + std::ops::Sub<Output = D>
-        + std::ops::Mul<f64, Output = D>,
-{
-    fn f(state: &S, model: &M, delay: &D, input: &I) -> S;
-    fn keep_delay(state: &S) -> D;
+        + Default
+        + Display
+        + std::ops::Mul<f64, Output = Self::StateT>
+        + std::ops::Add<Self::StateT, Output = Self::StateT>
+        + std::ops::AddAssign
+        + std::ops::Div<f64, Output = Self::StateT>
+        + IntoString;
+    type ModelT: Clone + Copy + Default;
+    type KeepT: Clone + Default;
+    fn keep_state(state: &Self::StateT) -> Self::KeepT;
 }
+
+pub trait Feedback: DynamicalSystem {
+    type FeedbackT: Sized
+        + Clone
+        + Copy
+        + Default
+        + std::iter::Sum
+        + std::ops::Add<Output = Self::FeedbackT>
+        + std::ops::AddAssign
+        + std::ops::Sub<Output = Self::FeedbackT>
+        + std::ops::Mul<f64, Output = Self::FeedbackT>
+        + std::ops::Mul<Self::WeightT, Output = Self::FeedbackT>;
+    type WeightT: Weight
+        + Sized
+        + Clone
+        + Copy
+        + Default
+        + std::ops::Mul
+        + std::ops::Mul<num_complex::Complex<f64>>
+        + std::ops::Mul<f64>
+        + std::ops::Mul<Self::FeedbackT>;
+    fn f(state: &Self::StateT, model: &Self::ModelT, feedback: &Self::FeedbackT) -> Self::StateT;
+    fn get_feedback(state: &Self::StateT) -> Self::FeedbackT;
+}
+
+pub type WeightReal = f64;
+pub type WeightComplex = num_complex::Complex<f64>;
+
+pub trait Weight {
+    fn from_edge(edge: &Edge) -> Self;
+}
+
+impl Weight for WeightReal {
+    fn from_edge(edge: &Edge) -> Self {
+        edge.strength
+    }
+}
+
+impl Weight for WeightComplex {
+    fn from_edge(edge: &Edge) -> Self {
+        edge.strength * (edge.turn * num_complex::Complex::<f64>::i() * 2.0 * PI).exp()
+    }
+}
+
+pub trait InitFunctions {} // todo!()

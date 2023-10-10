@@ -1,27 +1,36 @@
-// mod analysis;
-mod curve_simplification;
+use std::{
+    fs::File,
+    io::{BufWriter, Write},
+};
+
+mod composite_system;
 mod dynamical_system;
+// mod global_parameter_map;
 mod history;
+mod integration_methods;
 mod integrator;
 mod lang_kobayashi;
+mod mackey_glass;
 mod network;
+// mod parameter;
+// mod var;
 
-fn main() -> std::io::Result<()> {
-    let integration_time = 5000.0;
-    let stepsize = 1.0 / 64.0;
-    let pre_integration_buffer = 0.0;
-    let nodes = 4;
+mod curve_simplification;
 
-    let mut integrator = integrator::Integrator::new(
-        integration_time,
-        stepsize,
-        pre_integration_buffer,
-        4 * 4096,
-        nodes,
-        None,
-    );
+// use crate::parameter::Parameter;
+// use crate::network::Network;
 
-    integrator.integrate_rk4();
+fn main() {
+    let mut file = File::create("./test.txt").unwrap();
+    let mut writer = BufWriter::new(file);
 
-    Ok(())
+    let mut calculation = integrator::Calculation::example_setup(4);
+
+    calculation.n_steps_rk4(100);
+
+    for _ in 0..10000 {
+        // this should be done in a single step
+        calculation.single_step_rk4();
+        calculation.write_out(&mut writer);
+    }
 }

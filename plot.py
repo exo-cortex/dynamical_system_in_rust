@@ -2,25 +2,12 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
-import glob
 
-# plt.rcParams.update({
-#     "text.usetex": True,
-#     "font.family": "sans-serif",
-#     "font.sans-serif": "Helvetica",
-#     "font.size" : 18,
-# })
+file = np.loadtxt("test.txt")
 
-colors = plt.rcParams["axes.prop_cycle"]()
-
-filenames = glob.glob("data_*.txt")
-print(filenames)
-files = [np.loadtxt(filename) for filename in filenames]
-
-for i, f in enumerate(files):
-    print("data_dimensions: {}".format(np.shape(f)))
-    c = next(colors)["color"]
-    plt.plot(f[:,0], f[:,1] + i * 3, "-", ms=3.5, linewidth=1.25, color=c , label="e_{}".format(i))
+for i in range( (len(file[0])-1) // 2):
+    plt.plot(file[:,0], file[:,i*2+1], "-", ms=1.5, linewidth=1.25, label="e")
+    plt.plot(file[:,0], file[:,i*2+2], "-", ms=1.5, linewidth=1.25, label="n")
 
 plt.legend()
 plt.show()

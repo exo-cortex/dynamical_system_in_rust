@@ -1,24 +1,26 @@
-use ringbuffer::{AllocRingBuffer, RingBuffer, RingBufferExt, RingBufferWrite};
+use crate::dynamical_system::{DynamicalSystem, Feedback, Weight};
+use crate::network::{Edge, Network};
+use ringbuffer::{AllocRingBuffer, RingBuffer};
 use std::fmt;
 use std::mem;
 
 #[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
-pub struct ReadAtMultiply<F>
+pub struct ReadAtMultiply<WeightT>
 where
-    F: Sized + Clone,
+    WeightT: Sized + Clone,
 {
     pub at_node: usize,
     pub at_delay: usize,
-    pub weight: F,
+    pub weight: WeightT,
 }
 
 #[allow(dead_code)]
-impl<F> ReadAtMultiply<F>
+impl<WeightT> ReadAtMultiply<WeightT>
 where
-    F: Sized + Clone,
+    WeightT: Sized + Clone,
 {
-    pub fn new(at_node: usize, at_delay: usize, weight: F) -> Self {
+    pub fn new(at_node: usize, at_delay: usize, weight: WeightT) -> Self {
         ReadAtMultiply {
             at_node,
             at_delay,
@@ -28,70 +30,111 @@ where
 }
 
 #[allow(dead_code)]
-pub struct History<D, F>
-// D - delay type,
-// F float type for multiplication of delay in weighted sum.
+#[derive(Clone)]
+pub struct History<S, T>
+// FeedbackT - delay type,
+// WeightT float type for multiplication of delay in weighted sum.
 where
-    D: Sized
+    S: Feedback,
+    T: Sized
         + Clone
         + Copy
         + Default
         + core::iter::Sum
-        + std::ops::Add<Output = D>
+        + std::ops::Add<Output = T>
         + std::ops::AddAssign
-        + std::ops::Mul<F, Output = D>
-        + std::ops::Mul<F>,
-    F: Sized + Clone + Copy,
+        + std::ops::Mul<S::WeightT, Output = T>,
 {
-    history: Vec<AllocRingBuffer<D>>,
-    readers: Vec<Vec<ReadAtMultiply<F>>>,
+    history: Vec<AllocRingBuffer<T>>,
+    readers: Vec<Vec<ReadAtMultiply<S::WeightT>>>,
+    dt: f64,
 }
 
 #[allow(dead_code)]
-impl<D, F> History<D, F>
+impl<S, T> History<S, T>
 where
-    D: Sized
+    S: Feedback,
+    T: Sized
         + Clone
         + Copy
         + Default
         + core::iter::Sum
-        + std::ops::Add<Output = D>
+        + std::ops::Add<Output = T>
         + std::ops::AddAssign
-        + std::ops::Mul<F, Output = D>
-        + std::ops::Mul<f64, Output = D>
-        + std::ops::Mul<F>,
-    F: Sized + Clone + Copy,
+        + std::ops::Mul<S::WeightT, Output = T>,
 {
-    pub fn new(
-        nodes: usize,
-        edges: &[Vec<ReadAtMultiply<F>>],
-        use_equal_ringbuffers: bool, // test if unequal ringbuffers are faster or same are faster
-    ) -> Self {
-        Self::edges_valid(nodes, &edges).unwrap();
-        let mut history: Vec<AllocRingBuffer<D>> =
-            Self::delay_steps(nodes, edges, use_equal_ringbuffers)
-                .iter()
-                .map(|delay_steps| {
-                    AllocRingBuffer::<D>::with_capacity(delay_steps.next_power_of_two())
-                })
-                .collect();
-
-        Self::initialize_history(None, &mut history);
-
-        History {
-            history,
-            readers: edges.to_owned(),
-        }
+    pub fn new(dt: f64, network: &Network, equal_ringbuffers: bool) -> Self {
+        let mut history = History {
+            history: Vec::new(),
+            readers: Vec::new(),
+            dt,
+        };
+        history.setup_connections(&network, equal_ringbuffers);
+        history
     }
 
-    pub fn get_node_feedback(&mut self, into: usize) -> D {
+    pub fn setup_connections(&mut self, network: &Network, equal_ringbuffers: bool) {
+        // ++++
+        // Self::edges_valid(network.nodes, &network.get_edges_into_nodes());
+
+        // ++++
+        let ringbuffers: Vec<AllocRingBuffer<T>> = Self::delay_steps(
+            network.nodes,
+            &network.get_edges_into_nodes(),
+            equal_ringbuffers,
+        )
+        .iter()
+        .map(|delay| {
+            let delay_steps = ((delay / self.dt) as usize).next_power_of_two();
+            AllocRingBuffer::<T>::new(delay_steps)
+        })
+        .collect();
+
+        self.history = ringbuffers;
+
+        Self::initialize_history(None, &mut self.history);
+
+        self.readers = network
+            .get_edges_into_nodes()
+            .iter()
+            .map(|es| {
+                es.iter()
+                    .map(|e| ReadAtMultiply::<S::WeightT> {
+                        at_node: e.from,
+                        at_delay: (e.delay / self.dt) as usize,
+                        weight: S::WeightT::from_edge(e),
+                    })
+                    .collect()
+            })
+            .collect();
+    }
+
+    pub fn get_node_feedback(&mut self, into: usize) -> T {
         self.readers[into]
             .iter()
             .map(|r| *self.history[r.at_node].get(-(r.at_delay as isize)).unwrap() * r.weight)
             .sum()
     }
 
-    pub fn get_node_feedback_rk4(&mut self, into: usize) -> [D; 2] {
+    pub fn get_single_node_feedback_rk4(&mut self) -> [T; 2] {
+        [
+            self.readers[0]
+                .iter()
+                .map(|r| *self.history[r.at_node].get(-(r.at_delay as isize)).unwrap() * r.weight)
+                .sum(),
+            self.readers[0]
+                .iter()
+                .map(|r| {
+                    *self.history[r.at_node]
+                        .get(1 - (r.at_delay as isize))
+                        .unwrap()
+                        * r.weight
+                })
+                .sum(),
+        ]
+    }
+
+    pub fn get_node_feedback_rk4(&mut self, into: usize) -> [T; 2] {
         [
             self.readers[into]
                 .iter()
@@ -109,7 +152,7 @@ where
         ]
     }
 
-    pub fn get_all_feedback(&self) -> Vec<D> {
+    pub fn get_all_feedback(&self) -> Vec<T> {
         self.readers
             .iter()
             .map(|rs| {
@@ -122,7 +165,26 @@ where
             .collect()
     }
 
-    pub fn get_all_feedback_rk4(&self) -> Vec<[D; 2]> {
+    pub fn get_feedback_rk4(&self, into_node: usize) -> [T; 2] {
+        [
+            self.readers[into_node]
+                .iter()
+                .map(|r| *self.history[r.at_node].get(-(r.at_delay as isize)).unwrap() * r.weight)
+                .sum(),
+            self.readers[into_node]
+                .iter()
+                .map(|r| {
+                    *self.history[r.at_node]
+                        .get(1 - (r.at_delay as isize))
+                        .unwrap()
+                        * r.weight
+                })
+                .sum(),
+        ]
+        // [T::default(), T::default()]
+    }
+
+    pub fn get_all_feedback_rk4(&self) -> Vec<[T; 2]> {
         self.readers
             .iter()
             .map(|rs| {
@@ -145,17 +207,22 @@ where
             .collect()
     }
 
-    pub fn push_node_states(&mut self, new_states: Vec<D>) {
+    pub fn push_node_states(&mut self, new_states: Vec<T>) {
         for (h, s) in self.history.iter_mut().zip(new_states) {
             h.push(s)
         }
     }
-    fn edges_valid(nodes: usize, edges: &[Vec<ReadAtMultiply<F>>]) -> Result<(), String> {
+
+    pub fn push_node_state(&mut self, node: usize, new_state: T) {
+        self.history[node].push(new_state)
+    }
+
+    fn edges_valid(nodes: usize, edges: &Vec<Vec<Edge>>) -> Result<(), String> {
         for es in edges {
             for e in es {
-                if e.at_node >= nodes {
+                if e.from >= nodes {
                     return Err("edge from nonexistent node".to_string());
-                } else if e.at_delay == 0 {
+                } else if e.delay == 0.0 {
                     return Err("delay too small - cannot use with runge kutta 4".to_string());
                 }
             }
@@ -165,45 +232,40 @@ where
 
     fn delay_steps(
         nodes: usize,
-        edges: &[Vec<ReadAtMultiply<F>>],
+        edges: &Vec<Vec<Edge>>,
         use_equal_ringbuffers: bool, // test
-    ) -> Vec<usize> {
+    ) -> Vec<f64> {
         // check if edges are well formed, might be improved.
         for es in edges {
             for e in es {
-                if e.at_node >= nodes {
+                if e.from >= nodes {
                     panic!("edge from nonexistent node");
-                } else if e.at_delay == 0 {
+                } else if e.delay == 0.0 {
                     panic!("delay too small - cannot use with runge kutta 4");
                 }
             }
         }
 
-        let mut longest_delay_at_node: Vec<usize> = (0..nodes)
+        let mut longest_delay_at_node: Vec<f64> = (0..nodes)
             .map(|n| {
                 edges
                     .iter()
                     .flatten()
-                    .filter_map(|e| {
-                        if e.at_node == n {
-                            // println!(".");
-                            Some(e.at_delay)
-                        } else {
-                            None
-                        }
-                    })
-                    .fold(0, |max_delay, delay| max_delay.max(delay))
+                    .filter_map(|e| if e.from == n { Some(e.delay) } else { None })
+                    .fold(0.0f64, |max_delay, delay| max_delay.max(delay))
             })
             .collect();
 
         if use_equal_ringbuffers {
-            let longest_global_delay = longest_delay_at_node.iter().max().unwrap();
-            longest_delay_at_node = vec![*longest_global_delay; nodes];
+            let longest_global_delay = longest_delay_at_node
+                .iter()
+                .fold(0.0f64, |max_delay, &delay| max_delay.max(delay));
+            longest_delay_at_node = vec![longest_global_delay; nodes];
         }
         longest_delay_at_node
     }
 
-    fn initialize_history(fill_value: Option<D>, history: &mut Vec<AllocRingBuffer<D>>) {
+    fn initialize_history(fill_value: Option<T>, history: &mut Vec<AllocRingBuffer<T>>) {
         match fill_value {
             Some(value) => {
                 for h in history {
@@ -219,19 +281,42 @@ where
     }
 }
 
-impl<D, F> fmt::Display for History<D, F>
+impl<S, T> Default for History<S, T>
 where
-    D: Sized
+    S: Feedback,
+    T: Sized
         + Clone
         + Copy
         + Default
         + core::iter::Sum
-        + std::ops::Add<Output = D>
+        + std::ops::Add<Output = T>
         + std::ops::AddAssign
-        + std::ops::Mul<F, Output = D>
-        + std::ops::Mul<f64, Output = D>
-        + std::ops::Mul<F>,
-    F: Sized + Clone + Copy,
+        + std::ops::Mul<S::WeightT, Output = T>,
+{
+    fn default() -> Self {
+        History {
+            history: Vec::new(),
+            readers: Vec::new(),
+            dt: 1.0 / 64.0,
+        }
+    }
+}
+
+#[allow(dead_code)]
+impl<S, T> fmt::Display for History<S, T>
+where
+    S: DynamicalSystem + Feedback,
+    T: Sized
+        + Clone
+        + Copy
+        + Default
+        + core::iter::Sum
+        + std::ops::Add<Output = T>
+        + std::ops::AddAssign
+        + std::ops::Mul<S::WeightT, Output = T>
+        + std::ops::Mul<f64, Output = T>
+        + std::ops::Mul<S::WeightT>,
+    S::WeightT: Sized + Clone + Copy,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(
@@ -246,7 +331,7 @@ where
                 "[{}: {:+e} entries = {} bytes]",
                 i,
                 buffer.len(),
-                buffer.len() * mem::size_of::<D>()
+                buffer.len() * mem::size_of::<T>()
             )
             .unwrap();
         }

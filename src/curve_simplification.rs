@@ -7,46 +7,8 @@ use std::io::{BufWriter, Write};
 // do rdp (ramer-douglas-peucker) curve simplification
 // assumption: a timeseries has x values in an ascending, equidistant order
 
-pub fn write_simplified_nd_curve(
-    curve: &Vec<Vec<f64>>,
-    epsilon: f64,
-    outfile: &mut BufWriter<File>,
-) {
-    recursive_simplify_nd_curve(curve, 0, curve.len() - 1, epsilon.powi(2), outfile);
-    write_row(outfile, curve.last().unwrap());
-}
-
-fn recursive_simplify_nd_curve(
-    curve: &Vec<Vec<f64>>,
-    first: usize,
-    last: usize,
-    epsilon_square: f64,
-    outfile: &mut BufWriter<File>,
-) {
-    let mut max_sqr_distance = 0.0;
-    let mut index_of_max: usize = first + 1;
-    for i in first + 1..last {
-        let sqr_d = distance_point_to_line_squared_vec(&curve[first], &curve[last], &curve[i]);
-        if max_sqr_distance < sqr_d {
-            max_sqr_distance = sqr_d;
-            index_of_max = i;
-        }
-    }
-    // grandchild proposes this insead:
-    // let (index_of_max, max_sqr_distance) = curve
-    //     .iter()
-    //     .map(|v| distance_point_to_line_squared(&curve[first], &curve[last], v))
-    //     .enumerate()
-    //     .max_by(|(_, a), (_, b)| a.total_cmp(b))
-    //     .unwrap();
-
-    if max_sqr_distance > epsilon_square {
-        recursive_simplify_nd_curve(curve, first, index_of_max, epsilon_square, outfile);
-        recursive_simplify_nd_curve(curve, index_of_max, last, epsilon_square, outfile);
-    } else {
-        write_row(outfile, &curve[first]);
-    }
-}
+// case A: 1 dimensional curve f(t) -> simplify and write (t, f(t)) into file
+// case B: n_dimensional curve {f_1(t), ..., f_n(t)} -> simplify and write columns (t, f_n(t)) into file_n respectively
 
 // this shall be used to simplify (and write out) individual timeseries for each dynamic variable
 // for f(t) = (x_0(t), x_1(t), ..., x_n(t)) it shall write out
@@ -59,7 +21,7 @@ pub fn write_n_simplified_curves(
 ) {
     for (i, outfile) in &mut outfiles.iter_mut().enumerate().take(curve[0].len() - 1) {
         // write_row(outfile, &curve[0]);
-        simplify_subset_curve_recursive(
+        recursively_simplify_subset_curve(
             curve,
             0,
             i + 1,
@@ -74,7 +36,7 @@ pub fn write_n_simplified_curves(
 }
 
 #[allow(dead_code)]
-fn simplify_subset_curve_recursive(
+fn recursively_simplify_subset_curve(
     curve: &Vec<Vec<f64>>,
     time_index: usize,
     curve_index: usize,
@@ -124,7 +86,7 @@ fn simplify_subset_curve_recursive(
         }
     }
     if max_sqr_distance > epsilon_square {
-        simplify_subset_curve_recursive(
+        recursively_simplify_subset_curve(
             curve,
             0,
             curve_index,
@@ -133,7 +95,7 @@ fn simplify_subset_curve_recursive(
             epsilon_square,
             outfile,
         );
-        simplify_subset_curve_recursive(
+        recursively_simplify_subset_curve(
             curve,
             0,
             curve_index,
@@ -148,6 +110,7 @@ fn simplify_subset_curve_recursive(
     }
 }
 
+#[allow(dead_code)]
 fn recursive_simplify_subset(
     curve: &Vec<Vec<f64>>,
     curve_indices: &[usize],
@@ -211,6 +174,49 @@ fn recursive_simplify_subset(
     }
 }
 
+#[allow(dead_code)]
+pub fn write_simplified_nd_curve(
+    curve: &Vec<Vec<f64>>,
+    epsilon: f64,
+    outfile: &mut BufWriter<File>,
+) {
+    recursively_simplify_nd_curve(curve, 0, curve.len() - 1, epsilon.powi(2), outfile);
+    write_row(outfile, curve.last().unwrap());
+}
+
+#[allow(dead_code)]
+fn recursively_simplify_nd_curve(
+    curve: &[Vec<f64>],
+    first: usize,
+    last: usize,
+    epsilon_square: f64,
+    outfile: &mut BufWriter<File>,
+) {
+    let mut max_sqr_distance = 0.0;
+    let mut index_of_max: usize = first + 1;
+    for i in first + 1..last {
+        let sqr_d = distance_point_to_line_squared_vec(&curve[first], &curve[last], &curve[i]);
+        if max_sqr_distance < sqr_d {
+            max_sqr_distance = sqr_d;
+            index_of_max = i;
+        }
+    }
+    // grandchild proposes this insead:
+    // let (index_of_max, max_sqr_distance) = curve
+    //     .iter()
+    //     .map(|v| distance_point_to_line_squared(&curve[first], &curve[last], v))
+    //     .enumerate()
+    //     .max_by(|(_, a), (_, b)| a.total_cmp(b))
+    //     .unwrap();
+
+    if max_sqr_distance > epsilon_square {
+        recursively_simplify_nd_curve(curve, first, index_of_max, epsilon_square, outfile);
+        recursively_simplify_nd_curve(curve, index_of_max, last, epsilon_square, outfile);
+    } else {
+        write_row(outfile, &curve[first]);
+    }
+}
+
 pub fn write_row(outfile: &mut BufWriter<File>, values: &[f64]) {
     for value in values.iter().take(values.len() - 1) {
         let value_string = format!("{:.10}\t", value);
@@ -266,10 +272,18 @@ pub fn distance_point_to_line_squared_vec(a: &Vec<f64>, b: &Vec<f64>, point: &Ve
     squared_distance
 }
 
-pub fn distance_point_to_line_squared_2d(a: [&f64; 2], b: [&f64; 2], point: [&f64; 2]) -> f64 {
-    // if a.len() != b.len() || a.len() != point.len() {
+#[allow(dead_code)]
+pub fn distance_point_to_line_squared_2d(
+    first_point: [&f64; 2],
+    last_point: [&f64; 2],
+    mid_point: [&f64; 2],
+) -> f64 {
+    // if first_point.len() != last_point.len() || first_point.len() != mid_point.len() {
     //     panic!("vectors lengths are not equal!");
     // }
-    ((b[0] - a[0]) * (b[1] - point[1]) - (b[1] - a[1]) * (a[0] - point[0])).abs()
-        / ((b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2)).sqrt()
+    ((last_point[0] - first_point[0]) * (last_point[1] - mid_point[1])
+        - (last_point[1] - first_point[1]) * (first_point[0] - mid_point[0]))
+        .abs()
+        / ((last_point[0] - first_point[0]).powi(2) + (last_point[1] - first_point[1]).powi(2))
+            .sqrt()
 }

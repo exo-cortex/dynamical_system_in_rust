@@ -1,17 +1,18 @@
 [package]
-name = "lorentz_attractor"
+name = "temp_traits_integrator"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ringbuffer = "0.8.5"
-derive_more = "0.99.0"
 num-complex = "0.4.2"
+derive_more = "0.99.17"
 rand = { version = "0.8.5", features = [ "small_rng" ] }
+ringbuffer = "0.14.2"
+colored = "2.0.4"
+itertools = "0.11.0"
 
-[profile.release]
-# strip = true
+#[profile.release]
+# debug = true
 # lto = true
-# opt-level = "s"  # Optimize for size
