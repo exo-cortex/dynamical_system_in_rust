@@ -16,8 +16,6 @@ pub enum OperationMode {
     NoSave,
 }
 
-// const DOMAIN: &str = "general";
-
 #[allow(dead_code)]
 pub struct Calculation {
     dt: f64,

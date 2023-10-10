@@ -5,23 +5,17 @@ use std::{
 
 mod composite_system;
 mod dynamical_system;
-// mod global_parameter_map;
 mod history;
 mod integration_methods;
 mod integrator;
 mod lang_kobayashi;
 mod mackey_glass;
 mod network;
-// mod parameter;
-// mod var;
 
 mod curve_simplification;
 
-// use crate::parameter::Parameter;
-// use crate::network::Network;
-
 fn main() {
-    let mut file = File::create("./test.txt").unwrap();
+    let file = File::create("./test.txt").unwrap();
     let mut writer = BufWriter::new(file);
 
     let mut calculation = integrator::Calculation::example_setup(4);

@@ -1,5 +1,3 @@
-// use crate::{global_parameter_map::GlobalParameterMap, var::Var};
-
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use std::fmt;
 
