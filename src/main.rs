@@ -3,11 +3,11 @@ use std::{
     io::{BufWriter, Write},
 };
 
+mod calculation;
 mod composite_system;
 mod dynamical_system;
 mod history;
 mod integration_methods;
-mod integrator;
 mod lang_kobayashi;
 mod mackey_glass;
 mod network;

@@ -17,10 +17,12 @@ use std::fmt::Display;
 //     + Copy
 //     + Default
 //     + Display
-//     + std::ops::Mul<f64, Output = Self>
+//     + std::iter::Sum
 //     + std::ops::Add<Self, Output = Self>
 //     + std::ops::AddAssign
+//     + std::ops::Mul<f64, Output = Self>
 //     + std::ops::Div<f64, Output = Self>
+//     + IntoString
 // {
 // }
 
