@@ -1,7 +1,9 @@
+use num_complex::Complex32;
+
 use crate::{
-    dynamical_system::{Feedback, IntoString},
+    dynamical_system::{DynamicalSystem, Feedback, IntoString},
     history::History,
-    integration_methods::{self, IntegrationMethods, RungeKuttaDelay},
+    integration_methods::{self, IntegrateAndWrite, IntegrationMethods, RungeKuttaDelay},
     network::Network,
 };
 
@@ -46,7 +48,7 @@ where
     state: DynSystemT::StateT,
     model: DynSystemT::ModelT,
     feedback_history: History<DynSystemT, RungeKuttaDelay<DynSystemT::FeedbackT>>,
-    segment: Vec<DynSystemT::KeepT>,
+    // segment: Vec<DynSystemT::KeepT>,
 }
 
 #[allow(dead_code)]
@@ -63,7 +65,7 @@ where
             feedback_history: History::<DynSystemT, RungeKuttaDelay<DynSystemT::FeedbackT>>::new(
                 dt, &network, true,
             ),
-            segment: vec![DynSystemT::KeepT::default(); SEGMENT_SIZE],
+            // segment: vec![DynSystemT::KeepT::default(); SEGMENT_SIZE],
         }
     }
 }
@@ -99,6 +101,17 @@ where
     }
 }
 
+impl<DynSystemT> IntegrateAndWrite for SingleFeedbackSystem<DynSystemT>
+where
+    DynSystemT: Feedback,
+{
+    type KeepT = Vec<DynSystemT::KeepT>;
+    fn keep(&self) -> Self::KeepT {
+        vec![DynSystemT::keep_state(&self.state)]
+    }
+    // fn integrate_and_write_segment(&mut self) {}
+}
+
 // // ++++++++++++++++++++++++++++++++
 
 #[derive(Default)]
@@ -113,7 +126,7 @@ where
     states: Vec<DynSystemT::StateT>,
     model: DynSystemT::ModelT,
     feedback_history: History<DynSystemT, RungeKuttaDelay<DynSystemT::FeedbackT>>,
-    segment: Vec<Vec<DynSystemT::KeepT>>,
+    // segment: Vec<Vec<DynSystemT::KeepT>>,
 }
 
 #[allow(dead_code)]
@@ -131,7 +144,7 @@ where
             feedback_history: History::<DynSystemT, RungeKuttaDelay<DynSystemT::FeedbackT>>::new(
                 dt, &network, true,
             ),
-            segment: vec![vec![DynSystemT::KeepT::default(); network.get_nodes()]; SEGMENT_SIZE],
+            // segment: vec![vec![DynSystemT::KeepT::default(); network.get_nodes()]; SEGMENT_SIZE],
         }
     }
 }
@@ -184,6 +197,19 @@ where
     }
 }
 
+impl<DynSystemT> IntegrateAndWrite for MultipleIdenticalFeedbackSystems<DynSystemT>
+where
+    DynSystemT: Feedback,
+{
+    type KeepT = Vec<DynSystemT::KeepT>;
+    fn keep(&self) -> Self::KeepT {
+        self.states
+            .iter()
+            .map(|s| DynSystemT::keep_state(s))
+            .collect::<Self::KeepT>()
+    }
+}
+
 // // ++++++++++++++++++++++++++++++++
 
 #[derive(Default)]
@@ -198,7 +224,7 @@ where
     states: Vec<DynSystemT::StateT>,
     models: Vec<DynSystemT::ModelT>,
     feedback_history: History<DynSystemT, RungeKuttaDelay<DynSystemT::FeedbackT>>,
-    segment: Vec<Vec<DynSystemT::KeepT>>,
+    // segment: Vec<Vec<DynSystemT::KeepT>>,
 }
 
 #[allow(dead_code)]
@@ -216,7 +242,7 @@ where
             feedback_history: History::<DynSystemT, RungeKuttaDelay<DynSystemT::FeedbackT>>::new(
                 dt, &network, true,
             ),
-            segment: vec![vec![DynSystemT::KeepT::default(); network.get_nodes()]; SEGMENT_SIZE],
+            // segment: vec![vec![DynSystemT::KeepT::default(); network.get_nodes()]; SEGMENT_SIZE],
         }
     }
 }
@@ -267,5 +293,18 @@ where
             ))
         )
         .to_owned()
+    }
+}
+
+impl<DynSystemT> IntegrateAndWrite for MultipleDistinctFeedbackSystems<DynSystemT>
+where
+    DynSystemT: Feedback,
+{
+    type KeepT = Vec<DynSystemT::KeepT>;
+    fn keep(&self) -> Self::KeepT {
+        self.states
+            .iter()
+            .map(|s| DynSystemT::keep_state(s))
+            .collect::<Self::KeepT>()
     }
 }

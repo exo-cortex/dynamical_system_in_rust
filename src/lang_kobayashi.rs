@@ -28,10 +28,6 @@ pub struct System {}
 impl DynamicalSystem for System {
     type StateT = State;
     type ModelT = Model;
-    type KeepT = Keep;
-    fn keep_state(state: &Self::StateT) -> Self::KeepT {
-        [state.e.norm_sqr(), state.n]
-    }
 }
 
 // impl Uncoupled for System {
@@ -50,6 +46,7 @@ impl DynamicalSystem for System {
 impl Feedback for System {
     type FeedbackT = FeedbackState;
     type WeightT = WeightComplex;
+    type KeepT = Keep;
     fn f(state: &Self::StateT, model: &Self::ModelT, delay: &Self::FeedbackT) -> Self::StateT {
         Self::StateT {
             e: Complex::new(1.0, model.alpha) * state.n * state.e + delay,
@@ -59,6 +56,9 @@ impl Feedback for System {
     }
     fn get_feedback(state: &Self::StateT) -> Self::FeedbackT {
         state.e
+    }
+    fn keep_state(state: &Self::StateT) -> Self::KeepT {
+        [state.e.norm_sqr(), state.n]
     }
 }
 

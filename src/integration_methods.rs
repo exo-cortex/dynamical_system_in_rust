@@ -13,7 +13,11 @@ pub trait IntegrateWithFeedback: Feedback {
     fn single_step_rk4(&mut self) -> Self::FeedbackT;
 }
 
-pub trait IntegrateAndWrite: DynamicalSystem {}
+pub trait IntegrateAndWrite {
+    type KeepT;
+    fn keep(&self) -> Self::KeepT;
+    // fn integrate_and_write_segment(&mut self);
+}
 
 //
 
