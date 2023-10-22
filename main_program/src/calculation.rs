@@ -40,10 +40,11 @@ impl Calculation {
         let dt = 1.0 / 64.0;
 
         let mut network = Network::new(nodes, 0.1, 0.1, 100.0, 0, dt);
-        network.put_ring(0.05, 0.1, 2.0);
-        network.put_edge(0, 0, 0.2, 0.1, 50.0);
-        network.randomize_strength(0.1, crate::network::SelectGroup::AllGroups);
-
+        // network.put_ring(0.1, 0.1, 50.0);
+        network.put_edge(0, 0, 0.1, 0.0, 100.0);
+        // network.randomize_strength(0.5, crate::network::SelectGroup::SingleGroup(0));
+        // network.randomize_delay_relative(0.9, crate::network::SelectGroup::SingleGroup(0));
+        println!("{}", network);
         Calculation {
             dt,
             network: Network::default(),

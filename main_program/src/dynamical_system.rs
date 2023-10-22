@@ -42,6 +42,8 @@ pub trait DynamicalSystem {
         + std::ops::Div<f64, Output = Self::StateT>
         + IntoString;
     type ModelT: Clone + Copy + Default;
+    type KeepT: Clone + Copy + Default;
+    fn keep_state(state: &Self::StateT) -> Self::KeepT;
 }
 
 pub trait Feedback: DynamicalSystem {
@@ -64,10 +66,8 @@ pub trait Feedback: DynamicalSystem {
         + std::ops::Mul<num_complex::Complex<f64>>
         + std::ops::Mul<f64>
         + std::ops::Mul<Self::FeedbackT>;
-    type KeepT: Clone + Copy + Default;
     fn f(state: &Self::StateT, model: &Self::ModelT, feedback: &Self::FeedbackT) -> Self::StateT;
     fn get_feedback(state: &Self::StateT) -> Self::FeedbackT;
-    fn keep_state(state: &Self::StateT) -> Self::KeepT;
 }
 
 pub type WeightReal = f64;

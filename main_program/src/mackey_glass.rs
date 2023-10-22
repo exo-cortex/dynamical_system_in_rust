@@ -8,22 +8,22 @@ pub struct System {}
 impl DynamicalSystem for System {
     type StateT = State;
     type ModelT = Model;
+    type KeepT = Keep;
+    fn keep_state(state: &Self::StateT) -> Self::KeepT {
+        state.p
+    }
 }
 
 #[allow(dead_code)]
 impl Feedback for System {
     type FeedbackT = FeedbackState;
     type WeightT = WeightReal;
-    type KeepT = Keep;
     fn f(state: &Self::StateT, model: &Self::ModelT, delay: &Self::FeedbackT) -> Self::StateT {
         Self::StateT {
             p: model.beta_0 / (1.0 + delay).powi(model.n) - model.gamma * state.p,
         }
     }
     fn get_feedback(state: &Self::StateT) -> FeedbackState {
-        state.p
-    }
-    fn keep_state(state: &Self::StateT) -> Self::KeepT {
         state.p
     }
 }

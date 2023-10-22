@@ -1,7 +1,5 @@
-use num_complex::Complex32;
-
 use crate::{
-    dynamical_system::{DynamicalSystem, Feedback, IntoString},
+    dynamical_system::{Feedback, IntoString},
     history::History,
     integration_methods::{self, IntegrateAndWrite, IntegrationMethods, RungeKuttaDelay},
     network::Network,
