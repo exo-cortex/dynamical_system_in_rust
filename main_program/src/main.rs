@@ -14,18 +14,18 @@ use network::Network;
 // use timeseries::Timeseries;
 
 fn main() {
-    let inv_dt = 64.0;
+    let inv_dt = 128.0;
 
-    let mut network = Network::new(16, 0.1, 0.1, 100.0, 0, 1.0 / inv_dt);
+    let mut network = Network::new(4, 0.1, 0.1, 100.0, 0, 1.0 / inv_dt);
     // network.put_edge(1, 1, 0.1, 0.3, 45.5);
-    network.put_edge(0, 0, 0.6, 0.5, 3.21);
+    network.put_edge(0, 0, 0.1, 0.5, 13.21);
     network.put_ring(0.1, 0.2, 20.0);
-    // let mut calculation = calculation::Calculation::example_setup_mackey(5, 1.0 / inv_dt, 4096);
+
     let mut calculation =
         // calculation::Calculation::example_setup_lang_kobayashi(5, 1.0 / inv_dt, 1024);
         calculation::Calculation::examples(1.0 / inv_dt, &network, 512, NodeSetup::Identical ,SystemType::LangKobayashi);
 
-    // calculation.n_steps_rk4((1000.0 * inv_dt) as usize);
+    calculation.n_steps_rk4((1000.0 * inv_dt) as usize);
 
     // let mut ts = Timeseries::new(1.0 / inv_dt, 2, 3, 1000, vec!["e", "n"]);
 

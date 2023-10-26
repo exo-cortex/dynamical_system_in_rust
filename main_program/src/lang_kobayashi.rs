@@ -101,7 +101,7 @@ impl Default for Model {
     fn default() -> Model {
         Model {
             alpha: 1.5,
-            pump: -0.1,
+            pump: 0.1,
             t_lk: 100.0,
         }
     }

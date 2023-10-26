@@ -96,7 +96,7 @@ impl Timeseries {
             self.dt,
             self.segment_start_time,
             &self.segment,
-            0.001,
+            0.05,
             &mut self.output_files,
         );
     }
