@@ -1,4 +1,4 @@
-use crate::dynamical_system::{DynamicalSystem, Feedback, Weight};
+use crate::dynamical_system::{Feedback, Weight};
 use crate::network::{Edge, Network};
 use ringbuffer::{AllocRingBuffer, RingBuffer};
 use std::fmt;
@@ -78,17 +78,18 @@ where
         // Self::edges_valid(network.nodes, &network.get_edges_into_nodes());
 
         // ++++
-        let ringbuffers: Vec<AllocRingBuffer<T>> = Self::delay_steps(
+        let delay_steps_needed = Self::max_delay_steps_needed(
             network.nodes,
             &network.get_edges_into_nodes(),
             equal_ringbuffers,
-        )
-        .iter()
-        .map(|delay| {
-            let delay_steps = ((delay / self.dt) as usize).next_power_of_two();
-            AllocRingBuffer::<T>::new(delay_steps)
-        })
-        .collect();
+        );
+        let ringbuffers: Vec<AllocRingBuffer<T>> = delay_steps_needed
+            .iter()
+            .map(|delay| {
+                let delay_steps = ((delay / self.dt) as usize).next_power_of_two();
+                AllocRingBuffer::<T>::new(delay_steps)
+            })
+            .collect();
 
         self.history = ringbuffers;
 
@@ -230,7 +231,7 @@ where
         Ok(())
     }
 
-    fn delay_steps(
+    fn max_delay_steps_needed(
         nodes: usize,
         edges: &Vec<Vec<Edge>>,
         use_equal_ringbuffers: bool, // test
@@ -246,7 +247,7 @@ where
             }
         }
 
-        let mut longest_delay_at_node: Vec<f64> = (0..nodes)
+        let longest_needed_delays: Vec<f64> = (0..nodes)
             .map(|n| {
                 edges
                     .iter()
@@ -256,13 +257,14 @@ where
             })
             .collect();
 
-        if use_equal_ringbuffers {
-            let longest_global_delay = longest_delay_at_node
+        if !use_equal_ringbuffers {
+            let longest_global_delay = longest_needed_delays
                 .iter()
                 .fold(0.0f64, |max_delay, &delay| max_delay.max(delay));
-            longest_delay_at_node = vec![longest_global_delay; nodes];
+            vec![longest_global_delay; nodes]
+        } else {
+            longest_needed_delays
         }
-        longest_delay_at_node
     }
 
     fn initialize_history(fill_value: Option<T>, history: &mut Vec<AllocRingBuffer<T>>) {
@@ -305,7 +307,7 @@ where
 #[allow(dead_code)]
 impl<S, T> fmt::Display for History<S, T>
 where
-    S: DynamicalSystem + Feedback,
+    S: Feedback,
     T: Sized
         + Clone
         + Copy
@@ -313,22 +315,19 @@ where
         + core::iter::Sum
         + std::ops::Add<Output = T>
         + std::ops::AddAssign
-        + std::ops::Mul<S::WeightT, Output = T>
-        + std::ops::Mul<f64, Output = T>
-        + std::ops::Mul<S::WeightT>,
-    S::WeightT: Sized + Clone + Copy,
+        + std::ops::Mul<S::WeightT, Output = T>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(
             f,
-            "history has {} ringbuffers, ringbuffer sizes: ",
+            "`history` has {} ringbuffers, each node's ringbuffer: ",
             &self.history.len()
         )
         .unwrap();
         for (i, buffer) in self.history.iter().enumerate() {
             writeln!(
                 f,
-                "[{}: {:+e} entries = {} bytes]",
+                "node {}: {:+e} entries = {} bytes",
                 i,
                 buffer.len(),
                 buffer.len() * mem::size_of::<T>()
@@ -336,9 +335,9 @@ where
             .unwrap();
         }
         for (i, rs) in self.readers.iter().enumerate() {
-            write!(f, "{}", i).unwrap();
+            writeln!(f, "node {} reads data from buffers: ", i).unwrap();
             for r in rs {
-                writeln!(f, " <-- {}, delay: {}", &r.at_node, &r.at_delay).unwrap();
+                writeln!(f, "     {}, with delay: {} steps", &r.at_node, &r.at_delay).unwrap();
             }
         }
         Ok(())

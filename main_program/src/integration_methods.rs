@@ -1,30 +1,16 @@
 use derive_more::{Add, AddAssign, Mul, Sum};
+use timeseries::Timeseries;
 
 use crate::dynamical_system::{DynamicalSystem, Feedback};
-
-pub trait Integrate: DynamicalSystem {
-    fn single_step_rk4(&mut self);
-    // fn single_step_rk4_keep(&mut self) -> Self::KeepT;
-    fn n_steps_rk4(&mut self, n: usize);
-}
-
-// do i need this?
-pub trait IntegrateWithFeedback: Feedback {
-    fn single_step_rk4(&mut self) -> Self::FeedbackT;
-}
-
-pub trait IntegrateAndWrite {
-    type KeepT;
-    fn keep(&self) -> Self::KeepT;
-    // fn integrate_and_write_segment(&mut self);
-}
-
-//
 
 pub trait IntegrationMethods {
     fn single_step_rk4(&mut self);
     fn n_steps_rk4(&mut self, n: usize);
-    fn into_str(&self) -> String;
+    fn into_str(&self) -> String; // ugly fix
+    fn keep_state(&self) -> Vec<f64>;
+    fn integrate_and_keep_segment(&mut self, timeseries: &mut Timeseries);
+    fn timeseries_row_len(&self) -> usize;
+    fn timeseries_curve_names(&self) -> &'static [&'static str];
 }
 
 #[allow(dead_code)]

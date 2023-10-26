@@ -8,9 +8,11 @@ pub struct System {}
 impl DynamicalSystem for System {
     type StateT = State;
     type ModelT = Model;
-    type KeepT = Keep;
-    fn keep_state(state: &Self::StateT) -> Self::KeepT {
-        state.p
+    fn keep_state(state: &Self::StateT) -> Vec<f64> {
+        vec![state.q]
+    }
+    fn keep_state_names() -> &'static [&'static str] {
+        &["p"]
     }
 }
 
@@ -20,32 +22,43 @@ impl Feedback for System {
     type WeightT = WeightReal;
     fn f(state: &Self::StateT, model: &Self::ModelT, delay: &Self::FeedbackT) -> Self::StateT {
         Self::StateT {
-            p: model.beta_0 / (1.0 + delay).powi(model.n) - model.gamma * state.p,
+            q: (model.beta_0 * delay) / (1.0 + delay.powi(model.n)) - model.gamma * state.q,
         }
     }
     fn get_feedback(state: &Self::StateT) -> FeedbackState {
-        state.p
+        state.q
+    }
+    fn keep_state_and_delay(state: &Self::StateT, feedback: &Self::FeedbackT) -> Vec<f64> {
+        vec![state.q, *feedback]
+    }
+    fn keep_state_and_delay_names() -> &'static [&'static str] {
+        &["q", "q_delay"]
     }
 }
 
 pub type FeedbackState = f64;
-pub type Keep = f64;
 
 #[allow(dead_code)]
-#[derive(Copy, Clone, Add, AddAssign, Mul, MulAssign, Div, Debug, Default)]
+#[derive(Copy, Clone, Add, AddAssign, Mul, MulAssign, Div, Debug)]
 pub struct State {
-    pub p: f64,
+    pub q: f64,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        State { q: 0.5 }
+    }
 }
 
 impl IntoString for State {
     fn write_out(&self) -> String {
-        format!("{}\n", self.p)
+        format!("{}\t", self.q)
     }
 }
 
 impl fmt::Display for State {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "p: {}", self.p)
+        write!(f, "q: {}", self.q)
     }
 }
 

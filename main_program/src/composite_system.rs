@@ -1,39 +1,44 @@
+use timeseries::Timeseries;
+
 use crate::{
     dynamical_system::{Feedback, IntoString},
     history::History,
-    integration_methods::{self, IntegrateAndWrite, IntegrationMethods, RungeKuttaDelay},
+    integration_methods::{self, IntegrationMethods, RungeKuttaDelay},
     network::Network,
 };
 
-const SEGMENT_SIZE: usize = 1024;
+const EQUAL_RINGBUFFERS: bool = true; // make each ringbuffer as long as the longest one needed
 
-#[allow(dead_code)]
-pub enum NodeSetup {
-    Single,
-    Identical,
-    Distinct,
-}
+// put this function into `Calculation`
+// pub fn new_composite_system<'a, DynSystemT>(
+//     network: &'a Network,
+//     dt: f64,
+//     node_setup: NodeSetup,
+// ) -> Box<dyn IntegrationMethods>
+// where
+//     DynSystemT: Feedback + 'static,
+// {
+//     match (network.get_nodes(), node_setup) {
+//         (1, _) => {
+//             println!("### single system");
+//             Box::new(SingleFeedbackSystem::<DynSystemT>::new(&network, dt))
+//         }
+//         (2.., NodeSetup::Identical) => {
+//             println!("### multiple identical systems");
+//             Box::new(MultipleIdenticalFeedbackSystems::<DynSystemT>::new(
+//                 &network, dt,
+//             ))
+//         }
 
-pub fn new_composite_system<'a, DynSystemT>(
-    network: &'a Network,
-    dt: f64,
-    node_setup: NodeSetup,
-) -> Box<dyn IntegrationMethods>
-where
-    DynSystemT: Feedback + 'static,
-{
-    match (network.get_nodes(), node_setup) {
-        (1, _) => Box::new(SingleFeedbackSystem::<DynSystemT>::new(&network, dt)),
-        (2.., NodeSetup::Identical) => Box::new(
-            MultipleIdenticalFeedbackSystems::<DynSystemT>::new(&network, dt),
-        ),
-
-        (2.., NodeSetup::Distinct) => Box::new(MultipleDistinctFeedbackSystems::<DynSystemT>::new(
-            &network, dt,
-        )),
-        (_, _) => unreachable!(),
-    }
-}
+//         (2.., NodeSetup::Distinct) => {
+//             println!("### multiple distinct systems");
+//             Box::new(MultipleDistinctFeedbackSystems::<DynSystemT>::new(
+//                 &network, dt,
+//             ))
+//         }
+//         (_, _) => unreachable!(),
+//     }
+// }
 
 #[derive(Default)]
 #[allow(dead_code)]
@@ -42,11 +47,10 @@ where
     DynSystemT: Feedback,
 {
     dt: f64,
-    time: f64,
+    pub time: f64,
     state: DynSystemT::StateT,
     model: DynSystemT::ModelT,
     feedback_history: History<DynSystemT, RungeKuttaDelay<DynSystemT::FeedbackT>>,
-    // segment: Vec<DynSystemT::KeepT>,
 }
 
 #[allow(dead_code)]
@@ -61,9 +65,10 @@ where
             state: DynSystemT::StateT::default(),
             model: DynSystemT::ModelT::default(),
             feedback_history: History::<DynSystemT, RungeKuttaDelay<DynSystemT::FeedbackT>>::new(
-                dt, &network, true,
+                dt,
+                &network,
+                EQUAL_RINGBUFFERS,
             ),
-            // segment: vec![DynSystemT::KeepT::default(); SEGMENT_SIZE],
         }
     }
 }
@@ -97,17 +102,24 @@ where
     fn into_str(&self) -> String {
         format!("{}\t{}", self.time, self.state.write_out())
     }
-}
-
-impl<DynSystemT> IntegrateAndWrite for SingleFeedbackSystem<DynSystemT>
-where
-    DynSystemT: Feedback,
-{
-    type KeepT = Vec<DynSystemT::KeepT>;
-    fn keep(&self) -> Self::KeepT {
-        vec![DynSystemT::keep_state(&self.state)]
+    fn keep_state(&self) -> Vec<f64> {
+        DynSystemT::keep_state(&self.state)
     }
-    // fn integrate_and_write_segment(&mut self) {}
+    fn integrate_and_keep_segment(&mut self, timeseries: &mut Timeseries) {
+        timeseries.update_time(&self.time);
+        timeseries.segment().iter_mut().for_each(|row| {
+            self.single_step_rk4();
+            row.iter_mut()
+                .zip(DynSystemT::keep_state(&self.state))
+                .for_each(|(el, keep_state)| *el = keep_state)
+        });
+    }
+    fn timeseries_row_len(&self) -> usize {
+        DynSystemT::keep_state(&DynSystemT::StateT::default()).len()
+    }
+    fn timeseries_curve_names(&self) -> &'static [&'static str] {
+        DynSystemT::keep_state_names()
+    }
 }
 
 // // ++++++++++++++++++++++++++++++++
@@ -119,12 +131,11 @@ where
     DynSystemT: Feedback + 'static,
 {
     dt: f64,
-    time: f64,
+    pub time: f64,
     nodes: usize,
     states: Vec<DynSystemT::StateT>,
     model: DynSystemT::ModelT,
     feedback_history: History<DynSystemT, RungeKuttaDelay<DynSystemT::FeedbackT>>,
-    // segment: Vec<Vec<DynSystemT::KeepT>>,
 }
 
 #[allow(dead_code)]
@@ -140,9 +151,10 @@ where
             states: vec![DynSystemT::StateT::default(); network.get_nodes()],
             model: DynSystemT::ModelT::default(),
             feedback_history: History::<DynSystemT, RungeKuttaDelay<DynSystemT::FeedbackT>>::new(
-                dt, &network, true,
+                dt,
+                &network,
+                EQUAL_RINGBUFFERS,
             ),
-            // segment: vec![vec![DynSystemT::KeepT::default(); network.get_nodes()]; SEGMENT_SIZE],
         }
     }
 }
@@ -193,18 +205,29 @@ where
         )
         .to_owned()
     }
-}
-
-impl<DynSystemT> IntegrateAndWrite for MultipleIdenticalFeedbackSystems<DynSystemT>
-where
-    DynSystemT: Feedback,
-{
-    type KeepT = Vec<DynSystemT::KeepT>;
-    fn keep(&self) -> Self::KeepT {
+    fn keep_state(&self) -> Vec<f64> {
         self.states
             .iter()
-            .map(|s| DynSystemT::keep_state(s))
-            .collect::<Self::KeepT>()
+            .map(|s| DynSystemT::keep_state(&s))
+            .flatten()
+            .collect::<Vec<f64>>()
+    }
+    fn integrate_and_keep_segment(&mut self, timeseries: &mut Timeseries) {
+        timeseries.update_time(&self.time);
+        timeseries.segment().iter_mut().for_each(|row| {
+            self.single_step_rk4();
+            row.iter_mut()
+                .zip(self.keep_state())
+                .for_each(|(el, keep_state)| *el = keep_state)
+        });
+    }
+    fn timeseries_row_len(&self) -> usize {
+        DynSystemT::keep_state(&DynSystemT::StateT::default()).len()
+    }
+    fn timeseries_curve_names(&self) -> &'static [&'static str] {
+        let names = DynSystemT::keep_state_names();
+        println!("{:?}", names);
+        names
     }
 }
 
@@ -217,12 +240,11 @@ where
     DynSystemT: Feedback,
 {
     dt: f64,
-    time: f64,
+    pub time: f64,
     nodes: usize,
     states: Vec<DynSystemT::StateT>,
     models: Vec<DynSystemT::ModelT>,
     feedback_history: History<DynSystemT, RungeKuttaDelay<DynSystemT::FeedbackT>>,
-    // segment: Vec<Vec<DynSystemT::KeepT>>,
 }
 
 #[allow(dead_code)]
@@ -238,9 +260,10 @@ where
             states: vec![DynSystemT::StateT::default(); network.get_nodes()],
             models: vec![DynSystemT::ModelT::default(); network.get_nodes()],
             feedback_history: History::<DynSystemT, RungeKuttaDelay<DynSystemT::FeedbackT>>::new(
-                dt, &network, true,
+                dt,
+                &network,
+                EQUAL_RINGBUFFERS,
             ),
-            // segment: vec![vec![DynSystemT::KeepT::default(); network.get_nodes()]; SEGMENT_SIZE],
         }
     }
 }
@@ -292,17 +315,27 @@ where
         )
         .to_owned()
     }
-}
-
-impl<DynSystemT> IntegrateAndWrite for MultipleDistinctFeedbackSystems<DynSystemT>
-where
-    DynSystemT: Feedback,
-{
-    type KeepT = Vec<DynSystemT::KeepT>;
-    fn keep(&self) -> Self::KeepT {
+    fn keep_state(&self) -> Vec<f64> {
         self.states
             .iter()
-            .map(|s| DynSystemT::keep_state(s))
-            .collect::<Self::KeepT>()
+            .map(|s| DynSystemT::keep_state(&s))
+            .flatten()
+            .collect::<Vec<f64>>()
+    }
+
+    fn integrate_and_keep_segment(&mut self, timeseries: &mut Timeseries) {
+        timeseries.update_time(&self.time);
+        timeseries.segment().iter_mut().for_each(|row| {
+            self.single_step_rk4();
+            row.iter_mut()
+                .zip(self.keep_state())
+                .for_each(|(el, keep_state)| *el = keep_state)
+        });
+    }
+    fn timeseries_row_len(&self) -> usize {
+        DynSystemT::keep_state(&DynSystemT::StateT::default()).len()
+    }
+    fn timeseries_curve_names(&self) -> &'static [&'static str] {
+        DynSystemT::keep_state_names()
     }
 }

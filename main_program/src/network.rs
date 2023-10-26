@@ -498,6 +498,7 @@ impl Network {
                     for edge in &mut self.edges {
                         if edge.group == which {
                             edge.strength += self.rng.gen_range(-1.0..1.0) * amount;
+                            edge.strength = edge.strength.abs();
                         }
                     }
                 }
@@ -506,12 +507,14 @@ impl Network {
                 if which < self.edges.len() {
                     for edge in &mut self.edges {
                         edge.strength += self.rng.gen_range(-1.0..1.0) * amount;
+                        edge.strength = edge.strength.abs();
                     }
                 }
             }
             SelectGroup::AllGroups => {
                 for edge in &mut self.edges {
                     edge.strength += self.rng.gen_range(-1.0..1.0) * amount;
+                    edge.strength = edge.strength.abs();
                 }
             }
         }
@@ -606,19 +609,12 @@ impl Network {
     pub fn get_edges_into_node(&self, into: usize) -> Vec<Edge> {
         self.edges
             .iter()
-            .filter_map(|e| {
-                if e.into == into {
-                    Some(e.clone())
-                } else {
-                    None
-                }
-            })
+            .filter_map(|e| if e.into == into { Some(*e) } else { None })
             .collect()
     }
 
     pub fn get_edges_into_nodes(&self) -> Vec<Vec<Edge>> {
         (0..self.nodes)
-            .into_iter()
             .map(|into| self.get_edges_into_node(into).clone())
             .collect()
     }
