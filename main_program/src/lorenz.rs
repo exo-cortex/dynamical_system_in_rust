@@ -1,77 +1,83 @@
+// extern crate derive_more;
 use crate::dynamical_system::{DynamicalSystem, Feedback, WeightReal};
-
 use derive_more::{Add, AddAssign, Div, Mul, MulAssign};
-use std::fmt;
+use std::fmt::{self, Display};
 
-#[allow(dead_code)]
 pub struct System {}
 impl DynamicalSystem for System {
     type StateT = State;
     type ModelT = Model;
     fn keep_state(state: &Self::StateT) -> Vec<f64> {
-        vec![state.q]
+        vec![state.x, state.y, state.z]
     }
     fn keep_state_names() -> &'static [&'static str] {
-        &["p"]
+        &["x", "y", "z"]
     }
 }
 
-#[allow(dead_code)]
 impl Feedback for System {
     type FeedbackT = FeedbackState;
     type WeightT = WeightReal;
     fn f(state: &Self::StateT, model: &Self::ModelT, delay: &Self::FeedbackT) -> Self::StateT {
         Self::StateT {
-            q: (model.beta_0 * delay) / (1.0 + delay.powi(model.n)) - model.gamma * state.q,
+            x: model.sigma * (state.y - state.x) + delay,
+            y: state.x * (model.rho - state.z) - state.y,
+            z: state.x * state.y - model.beta * state.z,
         }
     }
-    fn get_feedback(state: &Self::StateT) -> FeedbackState {
-        state.q
+    fn get_feedback(state: &Self::StateT) -> Self::FeedbackT {
+        state.x
     }
     fn keep_state_and_delay(state: &Self::StateT, feedback: &Self::FeedbackT) -> Vec<f64> {
-        vec![state.q, *feedback]
+        vec![state.x, state.y, state.z, *feedback]
     }
     fn keep_state_and_delay_names() -> &'static [&'static str] {
-        &["q", "q_delay"]
+        &["x", "y", "z", "x_delay"]
     }
 }
 
-pub type FeedbackState = f64;
+type FeedbackState = f64;
 
-#[allow(dead_code)]
 #[derive(Copy, Clone, Add, AddAssign, Mul, MulAssign, Div, Debug)]
 pub struct State {
-    pub q: f64,
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
 }
 
 impl Default for State {
     fn default() -> Self {
-        State { q: 0.5 }
+        State {
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+        }
     }
 }
 
-impl fmt::Display for State {
+impl Display for State {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "mackey-glass-state: q: {}", self.q)
+        write!(
+            f,
+            "lorenz-system-state: x: {}, y: {}, z: {}",
+            self.x, self.y, self.z
+        )
     }
 }
 
-#[allow(dead_code)]
 #[derive(Copy, Clone)]
 pub struct Model {
-    pub beta_0: f64,
-    pub n: i32,
-    pub gamma: f64,
+    pub sigma: f64,
+    pub beta: f64,
+    pub rho: f64,
 }
 
-#[allow(dead_code)]
-// from wikipedia
 impl Default for Model {
     fn default() -> Model {
         Model {
-            beta_0: 0.2,
-            n: 10,
-            gamma: 0.1,
+            sigma: 10.0,
+            beta: 8.0 / 3.0,
+            rho: 28.0,
         }
     }
 }

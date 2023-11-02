@@ -6,7 +6,6 @@ use crate::dynamical_system::{DynamicalSystem, Feedback};
 pub trait IntegrationMethods {
     fn single_step_rk4(&mut self);
     fn n_steps_rk4(&mut self, n: usize);
-    fn into_str(&self) -> String; // ugly fix
     fn keep_state(&self) -> Vec<f64>;
     fn integrate_and_keep_segment(&mut self, timeseries: &mut Timeseries);
     fn timeseries_row_len(&self) -> usize;
@@ -26,15 +25,16 @@ pub fn rk4<S>(
     state: &mut S::StateT,
     model: &S::ModelT,
     dt: &f64,
-    f: fn(&S::StateT, &S::ModelT) -> S::StateT,
+    time: &f64,
+    f: fn(&S::StateT, &S::ModelT, &f64) -> S::StateT,
 ) where
     S: DynamicalSystem,
 {
     // runge kutta 4 method creates 4 "helper steps"
-    let k1 = f(state, model);
-    let k2 = f(&(*state + k1 * 0.5 * *dt), model);
-    let k3 = f(&(*state + k2 * 0.5 * *dt), model);
-    let k4 = f(&(*state + k3 * *dt), model);
+    let k1 = f(state, model, time);
+    let k2 = f(&(*state + k1 * 0.5 * *dt), model, time);
+    let k3 = f(&(*state + k2 * 0.5 * *dt), model, time);
+    let k4 = f(&(*state + k3 * *dt), model, time);
 
     *state += (k1 + k2 * 2.0 + k3 * 2.0 + k4) / 6.0 * *dt;
 }

@@ -84,25 +84,25 @@ impl Timeseries {
     }
     // save simplified timeseries in individual files
     pub fn save_simplified_timeseries(&mut self) {
-        // curve_simplification::___write_n_simplified_timeseries(
-        //     self.dt,
-        //     self.segment_start_time,
-        //     &self.segment,
-        //     1.0,
-        //     &mut self.output_files,
-        // );
-
         simplify_timeseries::simplify_curves_individually(
             self.dt,
             self.segment_start_time,
             &self.segment,
-            0.05,
+            0.001,
             &mut self.output_files,
         );
     }
 
     // save simplified parametric plots
-    pub fn save_simplified_parametric_curves(&mut self) {}
+    // pub fn save_simplified_parametric_curves(&mut self, index_1: usize, index_2: usize) {
+    //     simplify_timeseries::simplify_parametric_subset_curve(
+    //         &self.segment,
+    //         0,
+    //         1,
+    //         0.001,
+    //         &mut self.output_files[0],
+    //     )
+    // }
 
     // save subsets of timeseries
     pub fn save_simplified_timeseries_subsets(&mut self, _keep_indices: &[usize]) {}
@@ -117,11 +117,27 @@ impl Display for Timeseries {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use simplify_timeseries::{distance_point_to_line_2d, distance_point_to_line_squared_2d};
 
-    // for example
     #[test]
-    fn it_works() {
-        let a = 0;
-        assert_eq!(0, a);
+    fn test_distance() {
+        // distance of point `p` from line through `a` and `b`
+        let a_1 = [0.0, 0.0];
+        let b_1 = [1.0, 0.0];
+        let p_1 = [1.0, 1.0];
+        assert_eq!(1.0, distance_point_to_line_2d(a_1, b_1, p_1));
+
+        let a_2 = [0.0, 1.0];
+        let b_2 = [1.0, 0.0];
+        let p_2 = [1.0, 1.0];
+        assert_eq!(
+            (0.50_f64).sqrt() as f32,
+            distance_point_to_line_2d(a_2, b_2, p_2) as f32
+        );
+
+        assert_eq!(
+            (0.50_f64) as f32,
+            distance_point_to_line_squared_2d(a_2, b_2, p_2) as f32
+        );
     }
 }

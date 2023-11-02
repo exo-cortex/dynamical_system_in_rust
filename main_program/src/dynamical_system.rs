@@ -1,7 +1,7 @@
 use crate::network::Edge;
 
 use std::f64::consts::PI;
-use std::fmt::Display;
+// use std::fmt::Display;
 
 // 2. with delay
 // delay systems must implement
@@ -26,21 +26,16 @@ use std::fmt::Display;
 // {
 // }
 
-pub trait IntoString {
-    fn write_out(&self) -> String;
-}
-
 pub trait DynamicalSystem {
     type StateT: Sized
         + Clone
         + Copy
         + Default
-        + Display
+        // + Display
         + std::ops::Mul<f64, Output = Self::StateT>
         + std::ops::Add<Self::StateT, Output = Self::StateT>
         + std::ops::AddAssign
-        + std::ops::Div<f64, Output = Self::StateT>
-        + IntoString;
+        + std::ops::Div<f64, Output = Self::StateT>;
     type ModelT: Clone + Copy + Default;
     // fn keep_state(state: &Self::StateT) -> Self::KeepT;
     // type KeepT: Clone + Copy + Default;
@@ -68,7 +63,12 @@ pub trait Feedback: DynamicalSystem {
         + std::ops::Mul<num_complex::Complex<f64>>
         + std::ops::Mul<f64>
         + std::ops::Mul<Self::FeedbackT>;
-    fn f(state: &Self::StateT, model: &Self::ModelT, feedback: &Self::FeedbackT) -> Self::StateT;
+    fn f(
+        state: &Self::StateT,
+        model: &Self::ModelT,
+        feedback: &Self::FeedbackT,
+        // time: &f64, // maybe different ?
+    ) -> Self::StateT;
     fn get_feedback(state: &Self::StateT) -> Self::FeedbackT;
     fn keep_state_and_delay(state: &Self::StateT, feedback: &Self::FeedbackT) -> Vec<f64>;
     fn keep_state_and_delay_names() -> &'static [&'static str];
@@ -93,4 +93,10 @@ impl Weight for WeightComplex {
     }
 }
 
+// experimental traits
+
 pub trait InitFunctions {} // todo!()
+
+pub trait AsData<const N: usize> {
+    fn get_data(&self) -> [f64; N];
+}

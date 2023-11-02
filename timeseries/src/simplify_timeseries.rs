@@ -10,8 +10,8 @@ pub fn simplify_curves_individually(
     outfiles: &mut [BufWriter<File>],
 ) {
     for (i, outfile) in &mut outfiles.iter_mut().enumerate() {
-        // write!(outfile, "{}\t{}\n", start_time as f64, &curve[0][i]).unwrap();
-        recursively_simplify(
+        write!(outfile, "{}\t{}\n", start_time as f64, &curves[0][i]).unwrap();
+        recursively_simplify_with_time(
             dt,
             start_time,
             curves,
@@ -20,93 +20,198 @@ pub fn simplify_curves_individually(
             curves.len() - 1,
             epsilon.powi(2),
             outfile,
+            // 0,
         );
         // write_row(outfile, (curve.last().unwrap()));
-        outfile.flush().unwrap();
+        // outfile.flush().unwrap();
+        // println!();
     }
 }
 
 #[allow(dead_code)]
-fn recursively_simplify(
+fn recursively_simplify_with_time(
     dt: f64,
     start_time: f64,
     curves: &Vec<Vec<f64>>,
     curve_index: usize,
-    fragment_start_index: usize,
-    fragment_end_index: usize,
+    first_element: usize,
+    last_element: usize,
     epsilon_square: f64,
     outfile: &mut BufWriter<File>,
 ) {
-    let mut max_distance_sqr = 0.0;
-    let mut index_of_max = fragment_start_index + 1;
+    let mut max_square_distance = 0.0;
+    let mut index_of_max = first_element + 1;
 
     let a = [
-        start_time + dt * fragment_start_index as f64,
-        curves[fragment_start_index][curve_index],
+        start_time + dt * first_element as f64,
+        curves[first_element][curve_index],
     ];
     let b = [
-        start_time + dt * fragment_end_index as f64,
-        curves[fragment_end_index][curve_index],
+        start_time + dt * last_element as f64,
+        curves[last_element][curve_index],
     ];
 
-    // here cargo clippy makes a suggestion
-    // for i in fragment_start_index + 1..fragment_end_index {
+    // for i in first_element + 1..last_element - 1 {
     for (i, row) in curves
         .iter()
         .enumerate()
-        .take(fragment_end_index)
-        .skip(fragment_start_index + 1)
+        // until `last_element - 1`
+        .take(last_element - 1)
+        // start at `first_element + 1`
+        .skip(first_element + 1)
     {
+        // print!("{i} ");
+        // let mid_point = [start_time + dt * i as f64, curves[i][curve_index]];
         let mid_point = [start_time + dt * i as f64, row[curve_index]];
 
-        let sqr_d = distance_point_to_line_squared_2d(a, b, mid_point);
-        if max_distance_sqr < sqr_d {
-            max_distance_sqr = sqr_d;
+        let square_distance = distance_point_to_line_squared_2d(a, b, mid_point);
+        if max_square_distance < square_distance {
+            max_square_distance = square_distance;
             index_of_max = i;
         }
     }
-    if max_distance_sqr > epsilon_square {
-        recursively_simplify(
+
+    if max_square_distance > epsilon_square {
+        recursively_simplify_with_time(
             dt,
             start_time,
             curves,
             curve_index,
-            fragment_start_index,
+            first_element,
             index_of_max,
             epsilon_square,
             outfile,
         );
-
-        recursively_simplify(
+        recursively_simplify_with_time(
             dt,
             start_time,
             curves,
             curve_index,
             index_of_max,
-            fragment_end_index,
+            last_element,
             epsilon_square,
             outfile,
         );
     } else {
-        // write_row(outfile, &curves[fragment_start_index]);
-        writeln!(outfile, "{:.6}\t{:.6}", a[0], a[1]).unwrap();
-        // println!("Save [{}]", fragment_start_index);
-        // write!(outfile, "{}\t{}\n", &a[0], &a[1]).unwrap();
+        writeln!(
+            outfile,
+            "{:.6}\t{:.6}",
+            start_time + dt * index_of_max as f64,
+            curves[index_of_max][curve_index]
+        )
+        .unwrap();
+    }
+}
+
+pub fn simplify_parametric_subset_curve(
+    curves: &Vec<Vec<f64>>,
+    index_1: usize,
+    index_2: usize,
+    epsilon: f64,
+    outfile: &mut BufWriter<File>,
+) {
+    write!(
+        outfile,
+        "{}\t{}\n",
+        &curves[0][index_1], &curves[0][index_2]
+    )
+    .unwrap();
+    recursively_simplify_subset_pair(
+        curves,
+        index_1,
+        index_2,
+        0,
+        curves.len() - 1,
+        epsilon.powi(2),
+        outfile,
+    );
+    // write_row(outfile, (curve.last().unwrap()));
+    // outfile.flush().unwrap();
+    // println!();
+}
+
+#[allow(dead_code)]
+fn recursively_simplify_subset_pair(
+    curves: &Vec<Vec<f64>>,
+    index_1: usize,
+    index_2: usize,
+    first_element: usize,
+    last_element: usize,
+    epsilon_square: f64,
+    outfile: &mut BufWriter<File>,
+) {
+    let mut max_square_distance = 0.0;
+    let mut index_of_max = first_element + 1;
+
+    let a = [
+        curves[first_element][index_1],
+        curves[first_element][index_2],
+    ];
+    let b = [curves[last_element][index_1], curves[last_element][index_2]];
+
+    // for i in first_element + 1..last_element - 1 {
+    for (i, row) in curves
+        .iter()
+        .enumerate()
+        // until `last_element - 1`
+        .take(last_element - 1)
+        // start at `first_element + 1`
+        .skip(first_element + 1)
+    {
+        // print!("{i} ");
+        // let mid_point = [start_time + dt * i as f64, curves[i][curve_index]];
+        let mid_point = [row[index_1], row[index_2]];
+
+        let square_distance = distance_point_to_line_squared_2d(a, b, mid_point);
+        if max_square_distance < square_distance {
+            max_square_distance = square_distance;
+            index_of_max = i;
+        }
+    }
+
+    if max_square_distance > epsilon_square {
+        recursively_simplify_subset_pair(
+            curves,
+            index_1,
+            index_2,
+            first_element,
+            index_of_max,
+            epsilon_square,
+            outfile,
+        );
+        recursively_simplify_subset_pair(
+            curves,
+            index_1,
+            index_2,
+            index_of_max,
+            last_element,
+            epsilon_square,
+            outfile,
+        );
+    } else {
+        writeln!(
+            outfile,
+            "{:.6}\t{:.6}",
+            curves[index_of_max][index_1], curves[index_of_max][index_2]
+        )
+        .unwrap();
     }
 }
 
 #[allow(dead_code)]
-pub fn distance_point_to_line_squared_2d(
-    first_point: [f64; 2],
-    last_point: [f64; 2],
-    mid_point: [f64; 2],
-) -> f64 {
-    // if first_point.len() != last_point.len() || first_point.len() != mid_point.len() {
+pub fn distance_point_to_line_2d(a: [f64; 2], b: [f64; 2], p: [f64; 2]) -> f64 {
+    // if a.len() != b.len() || a.len() != p.len() {
     //     panic!("vectors lengths are not equal!");
     // }
-    ((last_point[0] - first_point[0]) * (last_point[1] - mid_point[1])
-        - (last_point[1] - first_point[1]) * (first_point[0] - mid_point[0]))
-        .abs()
-        / ((last_point[0] - first_point[0]).powi(2) + (last_point[1] - first_point[1]).powi(2))
-            .sqrt()
+    ((b[0] - a[0]) * (a[1] - p[1]) - (b[1] - a[1]) * (a[0] - p[0])).abs()
+        / ((b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2)).sqrt()
+}
+
+#[allow(dead_code)]
+pub fn distance_point_to_line_squared_2d(a: [f64; 2], b: [f64; 2], p: [f64; 2]) -> f64 {
+    // if a.len() != b.len() || a.len() != p.len() {
+    //     panic!("vectors lengths are not equal!");
+    // }
+    ((b[0] - a[0]) * (a[1] - p[1]) - (b[1] - a[1]) * (a[0] - p[0])).powi(2)
+        / ((b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2))
 }

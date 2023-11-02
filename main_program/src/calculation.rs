@@ -1,19 +1,19 @@
-use core::time;
-use std::fs::File;
-use std::io::{BufWriter, Write};
-
 use timeseries::Timeseries;
 
-use crate::dynamical_system::{DynamicalSystem, Feedback};
+// use crate::dynamical_system::{DynamicalSystem, Feedback};
 
 use crate::{
     composite_system::{
         MultipleDistinctFeedbackSystems, MultipleIdenticalFeedbackSystems, SingleFeedbackSystem,
     },
     integration_methods::IntegrationMethods,
-    lang_kobayashi, mackey_glass,
+    lang_kobayashi,
+    lorenz,
+    mackey_glass,
+    // mdre,
     network::Network,
 };
+use crate::{hindmarsh_rose, stuart_landau};
 
 #[allow(dead_code)]
 pub enum OperationMode {
@@ -45,9 +45,6 @@ impl<'a> Calculation<'a> {
     pub fn n_steps_rk4(&mut self, n: usize) {
         self.system.n_steps_rk4(n)
     }
-    pub fn write_out(&self, f: &mut BufWriter<File>) {
-        write!(f, "{}\n", self.system.into_str()).unwrap()
-    }
     pub fn integrate_segment(&mut self) {
         self.system.integrate_and_keep_segment(&mut self.timeseries);
         self.total_steps += self.segment_length as u64;
@@ -55,6 +52,7 @@ impl<'a> Calculation<'a> {
     pub fn integrate_segment_and_save(&mut self) {
         self.system.integrate_and_keep_segment(&mut self.timeseries);
         self.timeseries.save_simplified_timeseries();
+        // self.timeseries.save_simplified_parametric_curves(0, 1);
         self.total_steps += self.segment_length as u64;
     }
 
@@ -156,9 +154,14 @@ pub enum NodeSetup {
     Distinct,
 }
 
+#[allow(dead_code)]
 pub enum SystemType {
     LangKobayashi,
+    Lorenz,
     MackeyGlass,
+    // MDRE,
+    HindmarshRose,
+    StuartLandau,
 }
 
 pub fn new_composite_system_of_type(
@@ -183,6 +186,26 @@ pub fn new_composite_system_of_type(
                         &network, dt,
                     ))
                 }
+                // SystemType::MDRE => {
+                //     println!("Microscopically-Derived-Rate-Equations");
+                //     Box::new(SingleFeedbackSystem::<mdre::System>::new(&network, dt))
+                // }
+                SystemType::Lorenz => {
+                    println!("Lorenz");
+                    Box::new(SingleFeedbackSystem::<lorenz::System>::new(&network, dt))
+                }
+                SystemType::HindmarshRose => {
+                    println!("Hindmarsh-Rose");
+                    Box::new(SingleFeedbackSystem::<hindmarsh_rose::System>::new(
+                        &network, dt,
+                    ))
+                }
+                SystemType::StuartLandau => {
+                    println!("Stuart-Landau");
+                    Box::new(SingleFeedbackSystem::<stuart_landau::System>::new(
+                        &network, dt,
+                    ))
+                }
             }
         }
         (2.., NodeSetup::Identical) => {
@@ -200,6 +223,34 @@ pub fn new_composite_system_of_type(
                     println!("Mackey-Glass");
                     Box::new(
                         MultipleIdenticalFeedbackSystems::<mackey_glass::System>::new(&network, dt),
+                    )
+                }
+                // SystemType::MDRE => {
+                //     println!("Microscopically-Derived-Rate-Equations");
+                //     Box::new(MultipleIdenticalFeedbackSystems::<mdre::System>::new(
+                //         &network, dt,
+                //     ))
+                // }
+                SystemType::Lorenz => {
+                    println!("Lorenz");
+                    Box::new(MultipleIdenticalFeedbackSystems::<lorenz::System>::new(
+                        &network, dt,
+                    ))
+                }
+                SystemType::HindmarshRose => {
+                    println!("Hindmarsh-Rose");
+                    Box::new(
+                        MultipleIdenticalFeedbackSystems::<hindmarsh_rose::System>::new(
+                            &network, dt,
+                        ),
+                    )
+                }
+                SystemType::StuartLandau => {
+                    println!("Stuart-Landau");
+                    Box::new(
+                        MultipleIdenticalFeedbackSystems::<stuart_landau::System>::new(
+                            &network, dt,
+                        ),
                     )
                 }
             }
@@ -220,6 +271,32 @@ pub fn new_composite_system_of_type(
                     println!("Mackey-Glass");
                     Box::new(
                         MultipleDistinctFeedbackSystems::<mackey_glass::System>::new(&network, dt),
+                    )
+                }
+                // SystemType::MDRE => {
+                //     println!("Microscopically-Derived-Rate-Equations");
+                //     Box::new(MultipleDistinctFeedbackSystems::<mdre::System>::new(
+                //         &network, dt,
+                //     ))
+                // }
+                SystemType::Lorenz => {
+                    println!("Lorenz");
+                    Box::new(MultipleDistinctFeedbackSystems::<lorenz::System>::new(
+                        &network, dt,
+                    ))
+                }
+                SystemType::HindmarshRose => {
+                    println!("Hindmarsh-Rose");
+                    Box::new(
+                        MultipleDistinctFeedbackSystems::<hindmarsh_rose::System>::new(
+                            &network, dt,
+                        ),
+                    )
+                }
+                SystemType::StuartLandau => {
+                    println!("Stuart-Landau");
+                    Box::new(
+                        MultipleDistinctFeedbackSystems::<stuart_landau::System>::new(&network, dt),
                     )
                 }
             }

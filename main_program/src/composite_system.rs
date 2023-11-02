@@ -1,7 +1,7 @@
 use timeseries::Timeseries;
 
 use crate::{
-    dynamical_system::{Feedback, IntoString},
+    dynamical_system::Feedback,
     history::History,
     integration_methods::{self, IntegrationMethods, RungeKuttaDelay},
     network::Network,
@@ -98,10 +98,6 @@ where
             self.single_step_rk4();
         }
     }
-
-    fn into_str(&self) -> String {
-        format!("{}\t{}", self.time, self.state.write_out())
-    }
     fn keep_state(&self) -> Vec<f64> {
         DynSystemT::keep_state(&self.state)
     }
@@ -193,18 +189,19 @@ where
         }
     }
 
-    fn into_str(&self) -> String {
-        format!(
-            "{}\t{}",
-            self.time,
-            self.states.iter().fold("".to_string(), |acc, s| format!(
-                "{}\t{}",
-                acc,
-                &s.write_out()
-            ))
-        )
-        .to_owned()
-    }
+    // fn into_str(&self) -> String {
+    //     format!(
+    //         "{}\t{}",
+    //         self.time,
+    //         self.states.iter().fold("".to_string(), |acc, s| format!(
+    //             "{}\t{}",
+    //             acc,
+    //             &s.write_out()
+    //         ))
+    //     )
+    //     .to_owned()
+    // }
+
     fn keep_state(&self) -> Vec<f64> {
         self.states
             .iter()
@@ -303,18 +300,19 @@ where
         }
     }
 
-    fn into_str(&self) -> String {
-        format!(
-            "{}\t{}",
-            self.time,
-            self.states.iter().fold("".to_string(), |acc, s| format!(
-                "{}\t{}",
-                acc,
-                s.write_out()
-            ))
-        )
-        .to_owned()
-    }
+    // fn into_str(&self) -> String {
+    //     format!(
+    //         "{}\t{}",
+    //         self.time,
+    //         self.states.iter().fold("".to_string(), |acc, s| format!(
+    //             "{}\t{}",
+    //             acc,
+    //             s.write_out()
+    //         ))
+    //     )
+    //     .to_owned()
+    // }
+
     fn keep_state(&self) -> Vec<f64> {
         self.states
             .iter()

@@ -1,4 +1,4 @@
-use crate::dynamical_system::{DynamicalSystem, Feedback, IntoString, WeightComplex};
+use crate::dynamical_system::{AsData, DynamicalSystem, Feedback, WeightComplex};
 use derive_more::{Add, AddAssign, Div, Mul, MulAssign};
 use num_complex::Complex;
 use std::fmt;
@@ -76,15 +76,13 @@ impl Default for State {
     }
 }
 
-impl IntoString for State {
-    fn write_out(&self) -> String {
-        format!("{}\t{}\t", self.e.norm_sqr(), self.n)
-    }
-}
-
 impl fmt::Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> fmt::Result {
-        write!(f, "|e|^2: {}, n: {}", self.e.norm_sqr(), self.n)
+        write!(
+            f,
+            "lang-kobayashi-state: Re(e): {}, Im(e): {}, n: {}",
+            self.e.re, self.e.im, self.n
+        )
     }
 }
 
@@ -104,5 +102,24 @@ impl Default for Model {
             pump: 0.1,
             t_lk: 100.0,
         }
+    }
+}
+
+// experimental
+// AsOutput<N, M> uses
+// N - numbering of the output
+//     each AsOutput impl has to have a different N
+// M - the size of the output array (better fixed-sized array for compilation)
+struct AsA<'a>(&'a State);
+impl<'a> AsData<2> for AsA<'a> {
+    fn get_data(&self) -> [f64; 2] {
+        [self.0.e.norm_sqr(), self.0.n]
+    }
+}
+
+struct AsB<'a>(&'a State);
+impl<'a> AsData<3> for AsB<'a> {
+    fn get_data(&self) -> [f64; 3] {
+        [self.0.e.re, self.0.e.im, self.0.n]
     }
 }
