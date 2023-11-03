@@ -10,7 +10,7 @@ files = [np.loadtxt(fn) for fn in file_names]
 # print(files)
 
 for (i, file) in enumerate(files):
-    plt.plot(file[:,0], i * 45.0 + file[:,1], "-", ms=0.5, linewidth=1.125, label="{}".format(file_names[i]))
+    plt.plot(file[:,0], i * 2 + file[:,1], "-", ms=0.5, linewidth=1.125, label="{}".format(file_names[i]))
     # plt.plot(file[:,0], ".", ms=1.5, linewidth=1.125, label="{}".format(file_names[i]))
 
 
