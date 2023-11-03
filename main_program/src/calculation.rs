@@ -6,6 +6,7 @@ use crate::{
     composite_system::{
         MultipleDistinctFeedbackSystems, MultipleIdenticalFeedbackSystems, SingleFeedbackSystem,
     },
+    fitzhugh_nagumo,
     integration_methods::IntegrationMethods,
     lang_kobayashi,
     lorenz,
@@ -162,6 +163,7 @@ pub enum SystemType {
     // MDRE,
     HindmarshRose,
     StuartLandau,
+    FitzHughNagumo,
 }
 
 pub fn new_composite_system_of_type(
@@ -203,6 +205,12 @@ pub fn new_composite_system_of_type(
                 SystemType::StuartLandau => {
                     println!("Stuart-Landau");
                     Box::new(SingleFeedbackSystem::<stuart_landau::System>::new(
+                        &network, dt,
+                    ))
+                }
+                SystemType::FitzHughNagumo => {
+                    println!("FitzHugh-Nagumo");
+                    Box::new(SingleFeedbackSystem::<fitzhugh_nagumo::System>::new(
                         &network, dt,
                     ))
                 }
@@ -253,6 +261,14 @@ pub fn new_composite_system_of_type(
                         ),
                     )
                 }
+                SystemType::FitzHughNagumo => {
+                    println!("FitzHugh-Nagumo");
+                    Box::new(
+                        MultipleIdenticalFeedbackSystems::<fitzhugh_nagumo::System>::new(
+                            &network, dt,
+                        ),
+                    )
+                }
             }
         }
 
@@ -297,6 +313,14 @@ pub fn new_composite_system_of_type(
                     println!("Stuart-Landau");
                     Box::new(
                         MultipleDistinctFeedbackSystems::<stuart_landau::System>::new(&network, dt),
+                    )
+                }
+                SystemType::FitzHughNagumo => {
+                    println!("FitzHugh-Nagumo");
+                    Box::new(
+                        MultipleIdenticalFeedbackSystems::<fitzhugh_nagumo::System>::new(
+                            &network, dt,
+                        ),
                     )
                 }
             }
