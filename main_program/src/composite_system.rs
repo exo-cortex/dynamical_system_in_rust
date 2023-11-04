@@ -7,7 +7,7 @@ use crate::{
     network::Network,
 };
 
-const EQUAL_RINGBUFFERS: bool = true; // make each ringbuffer as long as the longest one needed
+const EQUAL_RINGBUFFERS: bool = false; // make each ringbuffer as long as the longest one needed
 
 // put this function into `Calculation`
 // pub fn new_composite_system<'a, DynSystemT>(

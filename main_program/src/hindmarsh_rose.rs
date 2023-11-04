@@ -18,7 +18,7 @@ impl Feedback for System {
     type WeightT = WeightReal;
     fn f(state: &Self::StateT, model: &Self::ModelT, delay: &Self::FeedbackT) -> Self::StateT {
         State {
-            x: state.y + phi(&state.x, &model) - state.z + delay,
+            x: state.y + phi(&state.x, &model) - state.z + model.i + delay,
             y: psi(&state.x, &model) - state.y,
             z: model.r * (model.s * (state.x - model.x_r) - state.z),
         }
@@ -70,6 +70,7 @@ pub struct Model {
     r: f64,
     s: f64,
     x_r: f64,
+    i: f64,
 }
 
 impl Default for Model {
@@ -79,9 +80,10 @@ impl Default for Model {
             b: 3.0,
             c: 1.0,
             d: 5.0,
-            r: 0.005,
+            r: 0.002,
             s: 4.0,
-            x_r: 1.6,
+            x_r: -2.0,
+            i: 4.0,
         }
     }
 }

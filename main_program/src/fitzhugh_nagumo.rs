@@ -16,7 +16,7 @@ impl DynamicalSystem for System {
 
 impl Feedback for System {
     type FeedbackT = FeedbackState;
-    type WeightT = WeightReal;
+    type WeightT = Weight;
     fn f(state: &Self::StateT, model: &Self::ModelT, delay: &Self::FeedbackT) -> Self::StateT {
         State {
             v: state.v - state.v.powi(3) / 3.0 - state.w + model.i_ext + delay,

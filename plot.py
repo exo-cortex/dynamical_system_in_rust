@@ -7,19 +7,16 @@ import glob
 
 file_names = glob.glob("./data/*.txt")
 files = [np.loadtxt(fn) for fn in file_names]
-# print(files)
 
+for name in file_names:
+    print(name)
+
+
+offs = 0
 for (i, file) in enumerate(files):
-    plt.plot(file[:,0], i * 2 + file[:,1], "-", ms=0.5, linewidth=1.125, label="{}".format(file_names[i]))
-    # plt.plot(file[:,0], ".", ms=1.5, linewidth=1.125, label="{}".format(file_names[i]))
-
-
-
-# shift = 15 * 100//64
-
-# for i in range( (len(file[0])-1)):
-#     # plt.plot(file[:,0], i * 2.0 + file[:,i+1], "-", ms=1.5, linewidth=1.25, label="p")
-#     plt.plot(file[:-shift,i+1], file[shift:,i+1], "-", ms=1.5, linewidth=1.25, label="p")
+    if i % 3 == 0:
+        offs += 20
+    plt.plot(file[:,0], offs + file[:,1], "-", ms=0.5, linewidth=1.125, label="{}".format(file_names[i]))
 
 plt.legend()
 plt.show()

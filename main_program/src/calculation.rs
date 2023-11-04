@@ -1,7 +1,5 @@
 use timeseries::Timeseries;
 
-// use crate::dynamical_system::{DynamicalSystem, Feedback};
-
 use crate::{
     composite_system::{
         MultipleDistinctFeedbackSystems, MultipleIdenticalFeedbackSystems, SingleFeedbackSystem,
@@ -17,14 +15,17 @@ use crate::{
 use crate::{hindmarsh_rose, stuart_landau};
 
 #[allow(dead_code)]
-pub enum OperationMode {
-    SaveSegments(usize),
+pub enum Tasks {
+    IntegrateUntilTimeNoSave { time: f64 },
+    IntegrateSegmentsAndSave { segments: usize, epsilon: f64 },
+    SaveSegmentsTime { time: f64, epsilon: f64 },
     SaveExtrema,
     NoSave,
+    PrintTechnicalDetails,
 }
 
 #[allow(dead_code)]
-pub struct Calculation<'a> {
+pub struct Calculation<'a, 'b> {
     dt: f64,
     time: f64, // maybe time should be here ?
     pub total_steps: u64,
@@ -32,10 +33,11 @@ pub struct Calculation<'a> {
     network: &'a Network,
     pub system: Box<dyn IntegrationMethods>,
     pub timeseries: Timeseries,
+    task_sequence: &'b Vec<Tasks>,
 }
 
 #[allow(dead_code)]
-impl<'a> Calculation<'a> {
+impl<'a, 'b> Calculation<'a, 'b> {
     pub fn single_step_rk4(&mut self) {
         self.system.single_step_rk4()
     }
@@ -50,13 +52,44 @@ impl<'a> Calculation<'a> {
         self.system.integrate_and_keep_segment(&mut self.timeseries);
         self.total_steps += self.segment_length as u64;
     }
-    pub fn integrate_segment_and_save(&mut self) {
+    pub fn integrate_segment_and_save(&mut self, epsilon: &f64) {
         self.system.integrate_and_keep_segment(&mut self.timeseries);
-        self.timeseries.save_simplified_timeseries();
+        self.timeseries.save_simplified_timeseries(epsilon);
         // self.timeseries.save_simplified_parametric_curves(0, 1);
         self.total_steps += self.segment_length as u64;
     }
 
+    pub fn perform_tasks(&mut self) {
+        for task in self.task_sequence {
+            match task {
+                Tasks::IntegrateUntilTimeNoSave { time } => {
+                    let time_in_steps = (time / self.dt) as usize;
+                    self.n_steps_rk4(time_in_steps);
+                }
+                Tasks::SaveSegmentsTime { time, epsilon } => {
+                    let time_in_steps = (*time / self.dt) as usize;
+                    let num_segments = (time_in_steps / self.segment_length) + 1;
+                    for _ in 0..num_segments {
+                        self.integrate_segment_and_save(epsilon);
+                    }
+                }
+                Tasks::IntegrateSegmentsAndSave { segments, epsilon } => {
+                    for _ in 0..*segments {
+                        self.integrate_segment_and_save(&epsilon);
+                    }
+                }
+                Tasks::SaveExtrema => {
+                    todo!();
+                }
+                Tasks::PrintTechnicalDetails => {
+                    self.timeseries.display_simplification_ratio();
+                }
+                _ => {
+                    todo!();
+                }
+            }
+        }
+    }
     // +++++++++++++++++++++++++
     // +++++++++++++++++++++++++
     // +++++++++++++++++++++++++
@@ -66,6 +99,7 @@ impl<'a> Calculation<'a> {
         segment_length: usize,
         node_setup: NodeSetup,
         system_type: SystemType,
+        task_sequence: &'b Vec<Tasks>,
     ) -> Self {
         let system = new_composite_system_of_type(&network, dt, node_setup, system_type);
 
@@ -85,67 +119,9 @@ impl<'a> Calculation<'a> {
             network,
             system,
             timeseries,
+            task_sequence,
         }
     }
-
-    // pub fn example_setup_lang_kobayashi(nodes: usize, dt: f64, segment_length: usize) -> Self {
-    //     // create an example setup for testing
-
-    //     let mut network = Network::new(nodes, 0.1, 0.1, 100.0, 0, dt);
-    //     network.put_ring(0.1, 0.0, 512.0);
-    //     network.put_ring_reverse(0.1, 0.25, 121.0);
-    //     // network.put_edge(1, 1, 0.1, 0.0, 123.0);
-    //     network.put_edge(0, 0, 0.1, 0.0, 400.0);
-    //     network.put_edge(3, 3, 0.01, 0.0, 134.0);
-    //     network.randomize_strength(0.1, crate::network::SelectGroup::AllGroups);
-    //     network.randomize_delay_relative(0.1, crate::network::SelectGroup::AllGroups);
-    //     // println!("{}", network);
-    //     Calculation {
-    //         dt,
-    //         time: 0.0,
-    //         total_steps: 0,
-    //         segment_length,
-    //         network: &network,
-    //         system: new_composite_system::<lang_kobayashi::System>(
-    //             &network,
-    //             dt,
-    //             NodeSetup::Identical,
-    //         ),
-    //         timeseries: Timeseries::new(
-    //             dt,
-    //             network.get_nodes(),
-    //             lang_kobayashi::System::keep_state(&lang_kobayashi::State::default()).len(),
-    //             segment_length,
-    //             lang_kobayashi::System::keep_state_names(),
-    //         ),
-    //     }
-    // }
-    // pub fn example_setup_mackey(nodes: usize, dt: f64, segment_length: usize) -> Self {
-    //     let mut network = Network::new(nodes, 0.1, 0.1, 100.0, 0, dt);
-    //     network.put_edge(0, 0, 1.0, 0.0, 15.0);
-    //     network.put_edge(4, 4, 5.0, 0.0, 125.0);
-    //     network.put_ring(0.5, 0.0, 30.0);
-    //     println!("{}", network);
-    //     Calculation {
-    //         dt,
-    //         time: 0.0,
-    //         total_steps: 0,
-    //         segment_length,
-    //         network: &network,
-    //         system: new_composite_system::<mackey_glass::System>(
-    //             &network,
-    //             dt,
-    //             NodeSetup::Identical,
-    //         ),
-    //         timeseries: Timeseries::new(
-    //             dt,
-    //             network.get_nodes(),
-    //             mackey_glass::System::keep_state(&mackey_glass::State::default()).len(),
-    //             segment_length,
-    //             mackey_glass::System::keep_state_names(),
-    //         ),
-    //     }
-    // }
 }
 
 #[allow(dead_code)]

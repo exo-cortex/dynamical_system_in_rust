@@ -26,9 +26,13 @@ This Program is mainly for learning Rust. Right now it can only integrate the La
     - Legendre-functions
     - prediction of dynamical-systems
 
+
+- ### network
+- network with "no" weights (all weights = 1)
+- normalize weights by node's total output
+
+- ### cureve simplification
 - optimize the perpendicular distance from a point to a line in n dimensions.
-- functionality to simplify n-dimensional trajectories into individual one-dimensional time-series
-- implement differential equations with delay
 
 ### traits
     - implement generalized `FeedbackType`-trait to allow each system define a specific type of feedback.

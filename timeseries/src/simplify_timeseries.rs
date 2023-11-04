@@ -6,10 +6,11 @@ pub fn simplify_curves_individually(
     dt: f64,
     start_time: f64,
     curves: &Vec<Vec<f64>>,
-    epsilon: f64,
+    epsilon: &f64,
     outfiles: &mut [BufWriter<File>],
+    nums_written_lines: &mut Vec<u64>,
 ) {
-    for (i, outfile) in &mut outfiles.iter_mut().enumerate() {
+    for ((i, outfile), num_lines) in &mut outfiles.iter_mut().enumerate().zip(nums_written_lines) {
         write!(outfile, "{}\t{}\n", start_time as f64, &curves[0][i]).unwrap();
         recursively_simplify_with_time(
             dt,
@@ -20,6 +21,7 @@ pub fn simplify_curves_individually(
             curves.len() - 1,
             epsilon.powi(2),
             outfile,
+            num_lines,
             // 0,
         );
         // write_row(outfile, (curve.last().unwrap()));
@@ -38,6 +40,7 @@ fn recursively_simplify_with_time(
     last_element: usize,
     epsilon_square: f64,
     outfile: &mut BufWriter<File>,
+    num_lines: &mut u64,
 ) {
     let mut max_square_distance = 0.0;
     let mut index_of_max = first_element + 1;
@@ -81,6 +84,7 @@ fn recursively_simplify_with_time(
             index_of_max,
             epsilon_square,
             outfile,
+            num_lines,
         );
         recursively_simplify_with_time(
             dt,
@@ -91,6 +95,7 @@ fn recursively_simplify_with_time(
             last_element,
             epsilon_square,
             outfile,
+            num_lines,
         );
     } else {
         writeln!(
@@ -100,15 +105,18 @@ fn recursively_simplify_with_time(
             curves[index_of_max][curve_index]
         )
         .unwrap();
+        *num_lines += 1;
     }
 }
 
+#[allow(dead_code)]
 pub fn simplify_parametric_subset_curve(
     curves: &Vec<Vec<f64>>,
     index_1: usize,
     index_2: usize,
     epsilon: f64,
     outfile: &mut BufWriter<File>,
+    nums_written_lines: &u64,
 ) {
     write!(
         outfile,

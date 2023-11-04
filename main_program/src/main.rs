@@ -1,43 +1,103 @@
+use std::env;
+
+use calculation::{NodeSetup, SystemType, Tasks};
+use network::Network;
+
+mod timer;
+
 mod calculation;
 mod composite_system;
 mod dynamical_system;
 mod history;
 mod integration_methods;
-mod lang_kobayashi;
-mod mackey_glass;
 mod network;
 
-use calculation::{NodeSetup, SystemType};
-use network::Network;
-
-// mod curve_simplification;
-// use timeseries::Timeseries;
-mod hindmarsh_rose;
-mod lorenz;
-// mod mdre;
-mod stuart_landau;
-
 mod fitzhugh_nagumo;
+mod hindmarsh_rose;
+mod lang_kobayashi;
+mod lorenz;
+mod mackey_glass;
+mod stuart_landau;
+// mod mdre;
+
+use timer::Timer;
 
 fn main() {
-    let inv_dt = 4.0 * 64.0;
-    let segment_size = 4096;
+    let args = env::args().collect::<Vec<String>>();
 
-    let mut network = Network::new(5, 0.1, 0.1, 100.0, 0, 1.0 / inv_dt);
-    network.put_edge(0, 0, 0.5, 0.5, 115.57);
-    network.put_edge(0, 0, 0.25, 0.5, 51.57);
-    network.put_edge(0, 0, 0.125, 0.5, 215.57);
-    network.put_ring(0.05, 0.1, 40.0);
+    let mut inv_dt = 64.0;
+    let mut buffer_time = 1000.0;
+    let mut seg_length = 1024;
+    let mut segments = 10;
+    let mut epsilon = 0.1;
 
-    let mut calculation =
-        // calculation::Calculation::example_setup_lang_kobayashi(5, 1.0 / inv_dt, 1024);
-        calculation::Calculation::examples(1.0 / inv_dt, &network, segment_size, NodeSetup::Identical, SystemType::HindmarshRose);
-
-    // calculation.n_steps_rk4((1000.0 * inv_dt) as usize);
-
-    for _ in 0..20 {
-        calculation.integrate_segment_and_save();
+    for (i, pattern) in args.iter().enumerate() {
+        match pattern.as_str() {
+            "-idt" => {
+                if args.len() - i >= 1 {
+                    println!("{} {}", pattern, args[i + 1]);
+                    inv_dt = args[i + 1].parse().unwrap()
+                }
+            }
+            "-buft" => {
+                if args.len() - i >= 1 {
+                    println!("{} {}", pattern, args[i + 1]);
+                    buffer_time = args[i + 1].parse().unwrap()
+                }
+            }
+            "-segl" => {
+                if args.len() - i >= 1 {
+                    println!("{} {}", pattern, args[i + 1]);
+                    seg_length = args[i + 1].parse().unwrap()
+                }
+            }
+            "-segs" => {
+                if args.len() - i >= 1 {
+                    println!("{} {}", pattern, args[i + 1]);
+                    segments = args[i + 1].parse().unwrap()
+                }
+            }
+            "-epsilon" => {
+                if args.len() - i >= 1 {
+                    println!("{} {}", pattern, args[i + 1]);
+                    epsilon = args[i + 1].parse().unwrap()
+                }
+            }
+            _ => {}
+        }
     }
+
+    let mut network = Network::new(3, 0.1, 0.1, 100.0, 0, 1.0 / inv_dt);
+    network.put_edge(0, 0, 0.2, 0.5, 16.8);
+    network.put_ring(0.1, 0.5, 25.8);
+
+    let mut timer = Timer::new();
+
+    let task_sequence = vec![
+        Tasks::IntegrateUntilTimeNoSave { time: buffer_time },
+        Tasks::IntegrateSegmentsAndSave {
+            segments: segments,
+            epsilon: epsilon,
+        },
+        Tasks::PrintTechnicalDetails,
+    ];
+
+    let mut calculation = calculation::Calculation::examples(
+        1.0 / inv_dt,
+        &network,
+        seg_length,
+        NodeSetup::Identical,
+        SystemType::HindmarshRose,
+        &task_sequence,
+    );
+
+    timer.reset();
+
+    calculation.perform_tasks();
+    println!(
+        "time for integration was: {} ms",
+        timer.get_nanoseconds() as f64 / 1000000.0
+    );
 
     println!("integrated {} steps", calculation.total_steps);
 }

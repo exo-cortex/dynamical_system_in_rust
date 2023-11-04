@@ -1,4 +1,4 @@
-use crate::dynamical_system::{Feedback, Weight};
+use crate::dynamical_system::{Feedback, WeightFromEdge};
 use crate::network::{Edge, Network};
 use ringbuffer::{AllocRingBuffer, RingBuffer};
 use std::fmt;

@@ -31,6 +31,8 @@ pub struct Timeseries {
     segment_start_time: f64,
     segment: Vec<Vec<f64>>,
     output_files: Vec<BufWriter<File>>,
+    written_segments: u64,
+    written_lines: Vec<u64>,
 }
 
 impl Timeseries {
@@ -50,6 +52,8 @@ impl Timeseries {
             segment_start_time: 0.0,
             segment: vec![vec![0.0; full_dimension]; segment_size],
             output_files: Self::setup_files(num_nodes, dyn_var_names),
+            written_segments: 0,
+            written_lines: vec![0; full_dimension],
         }
     }
 
@@ -83,14 +87,16 @@ impl Timeseries {
         self.segment_start_time = *time;
     }
     // save simplified timeseries in individual files
-    pub fn save_simplified_timeseries(&mut self) {
+    pub fn save_simplified_timeseries(&mut self, epsilon: &f64) {
         simplify_timeseries::simplify_curves_individually(
             self.dt,
             self.segment_start_time,
             &self.segment,
-            0.001,
+            epsilon,
             &mut self.output_files,
+            &mut self.written_lines,
         );
+        self.written_segments += 1;
     }
 
     // save simplified parametric plots
@@ -106,6 +112,21 @@ impl Timeseries {
 
     // save subsets of timeseries
     pub fn save_simplified_timeseries_subsets(&mut self, _keep_indices: &[usize]) {}
+    pub fn display_simplification_ratio(&self) {
+        let integrated_steps = self.written_segments * self.segment.len() as u64;
+        let mut sum_written_lines = 0;
+        self.written_lines.iter().for_each(|wls| {
+            sum_written_lines += *wls;
+            println!(
+                "simplification_ratios of {}",
+                *wls as f64 / integrated_steps as f64
+            );
+        });
+        println!(
+            "total simplification ratio = {}",
+            sum_written_lines as f64 / (self.output_files.len() * integrated_steps as usize) as f64
+        )
+    }
 }
 
 impl Display for Timeseries {

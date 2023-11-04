@@ -54,7 +54,7 @@ pub trait Feedback: DynamicalSystem {
         + std::ops::Sub<Output = Self::FeedbackT>
         + std::ops::Mul<f64, Output = Self::FeedbackT>
         + std::ops::Mul<Self::WeightT, Output = Self::FeedbackT>;
-    type WeightT: Weight
+    type WeightT: WeightFromEdge
         + Sized
         + Clone
         + Copy
@@ -77,17 +77,17 @@ pub trait Feedback: DynamicalSystem {
 pub type WeightReal = f64;
 pub type WeightComplex = num_complex::Complex<f64>;
 
-pub trait Weight {
+pub trait WeightFromEdge {
     fn from_edge(edge: &Edge) -> Self;
 }
 
-impl Weight for WeightReal {
+impl WeightFromEdge for WeightReal {
     fn from_edge(edge: &Edge) -> Self {
         edge.strength
     }
 }
 
-impl Weight for WeightComplex {
+impl WeightFromEdge for WeightComplex {
     fn from_edge(edge: &Edge) -> Self {
         edge.strength * (edge.turn * num_complex::Complex::<f64>::i() * 2.0 * PI).exp()
     }
