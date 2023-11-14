@@ -1,7 +1,6 @@
 use crate::network::Edge;
 
 use std::f64::consts::PI;
-// use std::fmt::Display;
 
 // 2. with delay
 // delay systems must implement
@@ -94,8 +93,8 @@ impl WeightFromEdge for WeightComplex {
 }
 
 // experimental traits
-
-pub trait InitFunctions {} // todo!()
+// not yet used
+pub trait SystemInitialization {} // todo!()
 
 pub trait AsData<const N: usize> {
     fn get_data(&self) -> [f64; N];

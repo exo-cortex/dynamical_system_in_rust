@@ -1,27 +1,28 @@
-use timeseries::Timeseries;
+use timeseries::{SaveItems, Timeseries};
 
 use crate::{
     composite_system::{
         MultipleDistinctFeedbackSystems, MultipleIdenticalFeedbackSystems, SingleFeedbackSystem,
     },
     fitzhugh_nagumo,
+    hindmarsh_rose,
     integration_methods::IntegrationMethods,
     lang_kobayashi,
     lorenz,
     mackey_glass,
     // mdre,
     network::Network,
+    roessler,
+    stuart_landau,
 };
-use crate::{hindmarsh_rose, stuart_landau};
 
 #[allow(dead_code)]
 pub enum Tasks {
     IntegrateUntilTimeNoSave { time: f64 },
     IntegrateSegmentsAndSave { segments: usize, epsilon: f64 },
-    SaveSegmentsTime { time: f64, epsilon: f64 },
-    SaveExtrema,
-    NoSave,
     PrintTechnicalDetails,
+    // FindExtrema
+    // OtherStuff
 }
 
 #[allow(dead_code)]
@@ -34,28 +35,40 @@ pub struct Calculation<'a, 'b> {
     pub system: Box<dyn IntegrationMethods>,
     pub timeseries: Timeseries,
     task_sequence: &'b Vec<Tasks>,
+    save_items: SaveItems,
 }
 
 #[allow(dead_code)]
 impl<'a, 'b> Calculation<'a, 'b> {
     pub fn single_step_rk4(&mut self) {
-        self.system.single_step_rk4()
+        self.system.single_step_rk4();
     }
     pub fn single_step_rk4_count(&mut self) {
         self.system.single_step_rk4();
         self.total_steps += 1;
     }
     pub fn n_steps_rk4(&mut self, n: usize) {
-        self.system.n_steps_rk4(n)
+        self.system.n_steps_rk4(n);
+        self.total_steps += n as u64;
     }
     pub fn integrate_segment(&mut self) {
         self.system.integrate_and_keep_segment(&mut self.timeseries);
         self.total_steps += self.segment_length as u64;
     }
-    pub fn integrate_segment_and_save(&mut self, epsilon: &f64) {
+    pub fn integrate_segment_save_timeseries(&mut self, epsilon: &f64) {
         self.system.integrate_and_keep_segment(&mut self.timeseries);
         self.timeseries.save_simplified_timeseries(epsilon);
-        // self.timeseries.save_simplified_parametric_curves(0, 1);
+        self.total_steps += self.segment_length as u64;
+    }
+
+    pub fn integrate_segment_save_parametric_curves_2d(
+        &mut self,
+        variable_pairs: &Vec<[usize; 2]>,
+        epsilon: &f64,
+    ) {
+        self.system.integrate_and_keep_segment(&mut self.timeseries);
+        self.timeseries
+            .save_simplified_parametric_curves(variable_pairs, epsilon);
         self.total_steps += self.segment_length as u64;
     }
 
@@ -66,20 +79,30 @@ impl<'a, 'b> Calculation<'a, 'b> {
                     let time_in_steps = (time / self.dt) as usize;
                     self.n_steps_rk4(time_in_steps);
                 }
-                Tasks::SaveSegmentsTime { time, epsilon } => {
-                    let time_in_steps = (*time / self.dt) as usize;
-                    let num_segments = (time_in_steps / self.segment_length) + 1;
-                    for _ in 0..num_segments {
-                        self.integrate_segment_and_save(epsilon);
-                    }
-                }
                 Tasks::IntegrateSegmentsAndSave { segments, epsilon } => {
-                    for _ in 0..*segments {
-                        self.integrate_segment_and_save(&epsilon);
+                    match self.save_items.clone() {
+                        SaveItems::Timeseries => {
+                            for _ in 0..*segments {
+                                self.integrate_segment_save_timeseries(&epsilon);
+                            }
+                        }
+                        SaveItems::ParametricCurve2d { variable_pairs } => {
+                            for _ in 0..*segments {
+                                self.integrate_segment_save_parametric_curves_2d(
+                                    &variable_pairs,
+                                    epsilon,
+                                )
+                            }
+                        }
+                        SaveItems::TimeseriesAndParametricCurve2d { variable_pairs } => {
+                            for _ in 0..*segments {
+                                self.system.integrate_and_keep_segment(&mut self.timeseries);
+                                self.timeseries.save_simplified_timeseries(epsilon);
+                                self.timeseries
+                                    .save_simplified_parametric_curves(&variable_pairs, epsilon)
+                            }
+                        }
                     }
-                }
-                Tasks::SaveExtrema => {
-                    todo!();
                 }
                 Tasks::PrintTechnicalDetails => {
                     self.timeseries.display_simplification_ratio();
@@ -100,6 +123,7 @@ impl<'a, 'b> Calculation<'a, 'b> {
         node_setup: NodeSetup,
         system_type: SystemType,
         task_sequence: &'b Vec<Tasks>,
+        save_items: SaveItems,
     ) -> Self {
         let system = new_composite_system_of_type(&network, dt, node_setup, system_type);
 
@@ -109,10 +133,11 @@ impl<'a, 'b> Calculation<'a, 'b> {
             system.timeseries_row_len(),
             segment_length,
             system.timeseries_curve_names(),
+            &save_items,
         );
 
         Calculation {
-            dt: dt,
+            dt,
             time: 0.0,
             total_steps: 0,
             segment_length,
@@ -120,6 +145,7 @@ impl<'a, 'b> Calculation<'a, 'b> {
             system,
             timeseries,
             task_sequence,
+            save_items,
         }
     }
 }
@@ -140,6 +166,7 @@ pub enum SystemType {
     HindmarshRose,
     StuartLandau,
     FitzHughNagumo,
+    Roessler,
 }
 
 pub fn new_composite_system_of_type(
@@ -189,6 +216,10 @@ pub fn new_composite_system_of_type(
                     Box::new(SingleFeedbackSystem::<fitzhugh_nagumo::System>::new(
                         &network, dt,
                     ))
+                }
+                SystemType::Roessler => {
+                    println!("Roessler");
+                    Box::new(SingleFeedbackSystem::<roessler::System>::new(&network, dt))
                 }
             }
         }
@@ -245,6 +276,12 @@ pub fn new_composite_system_of_type(
                         ),
                     )
                 }
+                SystemType::Roessler => {
+                    println!("Roessler");
+                    Box::new(MultipleIdenticalFeedbackSystems::<roessler::System>::new(
+                        &network, dt,
+                    ))
+                }
             }
         }
 
@@ -294,42 +331,19 @@ pub fn new_composite_system_of_type(
                 SystemType::FitzHughNagumo => {
                     println!("FitzHugh-Nagumo");
                     Box::new(
-                        MultipleIdenticalFeedbackSystems::<fitzhugh_nagumo::System>::new(
+                        MultipleDistinctFeedbackSystems::<fitzhugh_nagumo::System>::new(
                             &network, dt,
                         ),
                     )
+                }
+                SystemType::Roessler => {
+                    println!("Roessler");
+                    Box::new(MultipleDistinctFeedbackSystems::<roessler::System>::new(
+                        &network, dt,
+                    ))
                 }
             }
         }
         (_, _) => unreachable!(),
     }
 }
-
-// pub fn new_composite_system<'a, DynSystemT>(
-//     network: &'a Network,
-//     dt: f64,
-//     node_setup: NodeSetup,
-// ) -> Box<dyn IntegrationMethods>
-// where
-//     DynSystemT: Feedback + 'static,
-// {
-//     match (network.get_nodes(), node_setup) {
-//         (1, _) => {
-//             println!("### single system");
-//             Box::new(SingleFeedbackSystem::<DynSystemT>::new(&network, dt))
-//         }
-//         (2.., NodeSetup::Identical) => {
-//             println!("### multiple identical systems");
-//             Box::new(MultipleIdenticalFeedbackSystems::<DynSystemT>::new(
-//                 &network, dt,
-//             ))
-//         }
-//         (2.., NodeSetup::Distinct) => {
-//             println!("### multiple distinct systems");
-//             Box::new(MultipleDistinctFeedbackSystems::<DynSystemT>::new(
-//                 &network, dt,
-//             ))
-//         }
-//         (_, _) => unreachable!(),
-//     }
-// }

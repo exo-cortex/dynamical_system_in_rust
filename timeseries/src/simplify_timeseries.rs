@@ -116,7 +116,7 @@ pub fn simplify_parametric_subset_curve(
     index_2: usize,
     epsilon: f64,
     outfile: &mut BufWriter<File>,
-    nums_written_lines: &u64,
+    nums_written_lines: &mut u64,
 ) {
     write!(
         outfile,
@@ -132,6 +132,7 @@ pub fn simplify_parametric_subset_curve(
         curves.len() - 1,
         epsilon.powi(2),
         outfile,
+        nums_written_lines,
     );
     // write_row(outfile, (curve.last().unwrap()));
     // outfile.flush().unwrap();
@@ -147,6 +148,7 @@ fn recursively_simplify_subset_pair(
     last_element: usize,
     epsilon_square: f64,
     outfile: &mut BufWriter<File>,
+    nums_written_lines: &mut u64,
 ) {
     let mut max_square_distance = 0.0;
     let mut index_of_max = first_element + 1;
@@ -186,6 +188,7 @@ fn recursively_simplify_subset_pair(
             index_of_max,
             epsilon_square,
             outfile,
+            nums_written_lines,
         );
         recursively_simplify_subset_pair(
             curves,
@@ -195,6 +198,7 @@ fn recursively_simplify_subset_pair(
             last_element,
             epsilon_square,
             outfile,
+            nums_written_lines,
         );
     } else {
         writeln!(
@@ -203,7 +207,63 @@ fn recursively_simplify_subset_pair(
             curves[index_of_max][index_1], curves[index_of_max][index_2]
         )
         .unwrap();
+        *nums_written_lines += 1;
     }
+}
+
+#[allow(dead_code)]
+pub fn simplify_parametric_curve_pairs(
+    curves: &Vec<Vec<f64>>,
+    num_nodes: usize,
+    num_variables: usize,
+    variable_pairs: &Vec<[usize; 2]>,
+    epsilon: &f64,
+    outfiles: &mut Vec<BufWriter<File>>,
+    nums_written_lines: &mut Vec<u64>,
+) {
+    outfiles
+        .iter_mut()
+        .zip((0..num_nodes).flat_map(|n| {
+            variable_pairs
+                .iter()
+                .map(move |[first, second]| [first + n * num_variables, second + n * num_variables])
+        }))
+        .zip(nums_written_lines)
+        .for_each(|((outfile, [i1, i2]), num_written_lines)| {
+            // println!("{:?}, [{}, {}]", outfile, i1, i2);
+
+            // write!(outfile, "{}\t{}\n", &curves[0][i1], &curves[0][i2]).unwrap();
+            // writeln!(outfile, "{:.6}\t{:.6}", curves[0][i1], curves[0][i2]).unwrap();
+            recursively_simplify_subset_pair(
+                curves,
+                i1,
+                i2,
+                0,
+                curves.len() - 1,
+                epsilon.powi(2),
+                outfile,
+                num_written_lines,
+            );
+        })
+
+    // for ((outfile, [index_1, index_2]), written_lines) in outfiles
+    //     .iter_mut()
+    //     .zip(variable_pairs)
+    //     .zip(&mut nums_written_lines)
+    // {}
+    //         println!("saving pair {} {}", index_1, index_1);
+    //         write!(
+    //             outfile,
+    //             "{}\t{}\n",
+    //             &curves[0][*index_1], &curves[0][*index_2]
+    //         )
+    //         .unwrap();
+    //     }
+    // });
+
+    // write_row(outfile, (curve.last().unwrap()));
+    // outfile.flush().unwrap();
+    // println!();
 }
 
 #[allow(dead_code)]
