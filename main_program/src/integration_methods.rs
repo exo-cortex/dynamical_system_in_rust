@@ -1,23 +1,15 @@
 use derive_more::{Add, AddAssign, Mul, Sum};
-use timeseries::Timeseries;
+use segment_storage::SegmentStorage;
 
-use crate::dynamical_system::{DynamicalSystem, Feedback};
+use dynamical_systems::dynamical_system::{DynamicalSystem, Feedback};
 
 pub trait IntegrationMethods {
     fn single_step_rk4(&mut self);
     fn n_steps_rk4(&mut self, n: usize);
     fn keep_state(&self) -> Vec<f64>;
-    fn integrate_and_keep_segment(&mut self, timeseries: &mut Timeseries);
+    fn integrate_and_keep_segment(&mut self, segment_storage: &mut SegmentStorage);
     fn timeseries_row_len(&self) -> usize;
     fn timeseries_curve_names(&self) -> &'static [&'static str];
-}
-
-#[allow(dead_code)]
-pub fn single_step_rk4<DynSystemT>(dynamical_system: &mut impl IntegrationMethods)
-where
-    DynSystemT: Feedback,
-{
-    dynamical_system.single_step_rk4();
 }
 
 #[allow(dead_code)]

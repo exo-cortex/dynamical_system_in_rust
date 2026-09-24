@@ -1,8 +1,27 @@
-use crate::dynamical_system::{Feedback, WeightFromEdge};
-use crate::network::{Edge, Network};
-use ringbuffer::{AllocRingBuffer, RingBuffer};
+use std::f64::consts::PI;
 use std::fmt;
 use std::mem;
+
+use network_builder::{edge::Edge, network::Network};
+use ringbuffer::{AllocRingBuffer, RingBuffer};
+
+use dynamical_systems::dynamical_system::Feedback;
+
+pub trait WeightFromEdge {
+    fn from_edge(edge: &Edge) -> Self;
+}
+
+impl WeightFromEdge for f64 {
+    fn from_edge(edge: &Edge) -> Self {
+        edge.strength
+    }
+}
+
+impl WeightFromEdge for num_complex::Complex<f64> {
+    fn from_edge(edge: &Edge) -> Self {
+        edge.strength * (edge.turn * num_complex::Complex::<f64>::i() * 2.0 * PI).exp()
+    }
+}
 
 #[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
@@ -36,6 +55,7 @@ pub struct History<S, T>
 // WeightT float type for multiplication of delay in weighted sum.
 where
     S: Feedback,
+    S::WeightT: WeightFromEdge,
     T: Sized
         + Clone
         + Copy
@@ -54,6 +74,7 @@ where
 impl<S, T> History<S, T>
 where
     S: Feedback,
+    S::WeightT: WeightFromEdge,
     T: Sized
         + Clone
         + Copy
@@ -286,6 +307,7 @@ where
 impl<S, T> Default for History<S, T>
 where
     S: Feedback,
+    S::WeightT: WeightFromEdge,
     T: Sized
         + Clone
         + Copy
@@ -308,6 +330,7 @@ where
 impl<S, T> fmt::Display for History<S, T>
 where
     S: Feedback,
+    S::WeightT: WeightFromEdge,
     T: Sized
         + Clone
         + Copy

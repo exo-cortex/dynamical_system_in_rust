@@ -6,14 +6,17 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-num-complex = "0.4.2"
-derive_more = "0.99.17"
-rand = { version = "0.8.5", features = [ "small_rng" ] }
-ringbuffer = "0.14.2"
-colored = "2.0.4"
-itertools = "0.11.0"
+num-complex = "*" # "0.4.2"
+derive_more = "*" # "0.99.17"
 
-timeseries = { path ="../timeseries" }
+rand = { version = "*", features = ["small_rng"] }
+ringbuffer = "*"                                   #"0.14.2"
+colored = "*"                                      #"2.0.4"
+itertools = "*"                                    # "0.11.0"
+
+segment_storage = { path = "../segment_storage" }
+network_builder = { path = "../network_builder" }
+dynamical_systems = { path = "../dynamical_systems" }
 
 #[profile.release]
 # debug = true

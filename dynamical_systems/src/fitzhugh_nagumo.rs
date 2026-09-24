@@ -1,4 +1,4 @@
-use crate::dynamical_system::{DynamicalSystem, Feedback, WeightReal};
+use crate::dynamical_system::{DynamicalSystem, Feedback, UncoupledSystem, WeightReal};
 
 use derive_more::{Add, AddAssign, Div, Mul, MulAssign};
 
@@ -35,6 +35,21 @@ impl Feedback for System {
     }
 }
 
+impl UncoupledSystem for System {
+    fn f(state: &Self::StateT, model: &Self::ModelT, _: &f64) -> Self::StateT {
+        State {
+            v: state.v - state.v.powi(3) / 3.0 - state.w + model.i_ext,
+            w: (state.v + model.a - model.b * state.w) / model.tau,
+        }
+    }
+    fn keep_state(state: &Self::StateT) -> Vec<f64> {
+        vec![state.v, state.w]
+    }
+    fn keep_state_names() -> &'static [&'static str] {
+        &["x", "y", "z"]
+    }
+}
+
 type FeedbackState = f64;
 type Weight = WeightReal;
 
@@ -63,7 +78,7 @@ impl Default for Model {
         Model {
             tau: 12.5,
             a: 0.7,
-            b: 0.8,
+            b: 0.2,
             i_ext: 0.25,
         }
     }

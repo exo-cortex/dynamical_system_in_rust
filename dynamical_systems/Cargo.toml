@@ -1,0 +1,9 @@
+[package]
+name = "dynamical_systems"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+num-complex = "*"
+derive_more = "*"
+rand = { version = "*", features = ["small_rng"] }

@@ -3,5 +3,7 @@ resolver = "2"
 
 members = [
     "main_program",
-    "timeseries",
+    "segment_storage",
+    "network_builder",
+    "dynamical_systems",
 ]

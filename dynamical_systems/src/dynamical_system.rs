@@ -1,29 +1,4 @@
-use crate::network::Edge;
-
-use std::f64::consts::PI;
-
-// 2. with delay
-// delay systems must implement
-// StateT = state: contains the dynamic variables
-// ModelT = model: contains the parameters
-// FeedbackT = delay: a delay system has to `keep` some derived quantity of `state` for delayed feedback
-// WeightT = weight: the delay will likely be used as feedback in a weighted sum
-// KeepT: some object that can be "collected"
-
-// pub trait State:
-//     Sized
-//     + Clone
-//     + Copy
-//     + Default
-//     + Display
-//     + std::iter::Sum
-//     + std::ops::Add<Self, Output = Self>
-//     + std::ops::AddAssign
-//     + std::ops::Mul<f64, Output = Self>
-//     + std::ops::Div<f64, Output = Self>
-//     + IntoString
-// {
-// }
+use rand::rngs::SmallRng;
 
 pub trait DynamicalSystem {
     type StateT: Sized
@@ -42,6 +17,16 @@ pub trait DynamicalSystem {
     fn keep_state_names() -> &'static [&'static str];
 }
 
+pub trait UncoupledSystem: DynamicalSystem {
+    fn f(
+        state: &Self::StateT,
+        model: &Self::ModelT,
+        time: &f64, // maybe different ?
+    ) -> Self::StateT;
+    fn keep_state(state: &Self::StateT) -> Vec<f64>;
+    fn keep_state_names() -> &'static [&'static str];
+}
+
 pub trait Feedback: DynamicalSystem {
     type FeedbackT: Sized
         + Clone
@@ -53,8 +38,7 @@ pub trait Feedback: DynamicalSystem {
         + std::ops::Sub<Output = Self::FeedbackT>
         + std::ops::Mul<f64, Output = Self::FeedbackT>
         + std::ops::Mul<Self::WeightT, Output = Self::FeedbackT>;
-    type WeightT: WeightFromEdge
-        + Sized
+    type WeightT: Sized
         + Clone
         + Copy
         + Default
@@ -76,26 +60,36 @@ pub trait Feedback: DynamicalSystem {
 pub type WeightReal = f64;
 pub type WeightComplex = num_complex::Complex<f64>;
 
-pub trait WeightFromEdge {
-    fn from_edge(edge: &Edge) -> Self;
-}
-
-impl WeightFromEdge for WeightReal {
-    fn from_edge(edge: &Edge) -> Self {
-        edge.strength
-    }
-}
-
-impl WeightFromEdge for WeightComplex {
-    fn from_edge(edge: &Edge) -> Self {
-        edge.strength * (edge.turn * num_complex::Complex::<f64>::i() * 2.0 * PI).exp()
-    }
-}
-
 // experimental traits
 // not yet used
-pub trait SystemInitialization {} // todo!()
 
-pub trait AsData<const N: usize> {
-    fn get_data(&self) -> [f64; N];
+pub trait NoisySystem: DynamicalSystem {}
+pub trait DrivenSystem: DynamicalSystem {}
+
+pub trait Init: DynamicalSystem + Feedback {
+    fn init_state(
+        init_string: &str,
+        rng: &mut SmallRng,
+        nodes: usize,
+        node_index: usize,
+    ) -> Self::StateT;
+    fn init_feedback(
+        init_string: &str,
+        rng: &mut SmallRng,
+        nodes: usize,
+        node_index: usize,
+    ) -> Self::FeedbackT;
+    fn init_model(
+        init_string: &str,
+        rng: &mut SmallRng,
+        nodes: usize,
+        node_index: usize,
+    ) -> Self::ModelT;
+} // todo!()
+
+// trait to make possible to return data from a system's dynamical
+// state in different ways
+pub trait AsData {
+    fn get_data_descriptions() -> Vec<&'static str>;
+    fn get_data(&self) -> Vec<f64>;
 }

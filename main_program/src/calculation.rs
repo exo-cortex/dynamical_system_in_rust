@@ -1,19 +1,17 @@
-use timeseries::{SaveItems, Timeseries};
+use {
+    network_builder::network::Network,
+    segment_storage::{all_timeseries, SegmentStorage},
+};
 
 use crate::{
     composite_system::{
         MultipleDistinctFeedbackSystems, MultipleIdenticalFeedbackSystems, SingleFeedbackSystem,
     },
-    fitzhugh_nagumo,
-    hindmarsh_rose,
     integration_methods::IntegrationMethods,
-    lang_kobayashi,
-    lorenz,
-    mackey_glass,
-    // mdre,
-    network::Network,
-    roessler,
-    stuart_landau,
+};
+
+use dynamical_systems::{
+    fitzhugh_nagumo, hindmarsh_rose, lang_kobayashi, lorenz, mackey_glass, roessler, stuart_landau,
 };
 
 #[allow(dead_code)]
@@ -21,21 +19,18 @@ pub enum Tasks {
     IntegrateUntilTimeNoSave { time: f64 },
     IntegrateSegmentsAndSave { segments: usize, epsilon: f64 },
     PrintTechnicalDetails,
-    // FindExtrema
-    // OtherStuff
 }
 
 #[allow(dead_code)]
 pub struct Calculation<'a, 'b> {
     dt: f64,
-    time: f64, // maybe time should be here ?
+    time: f64,
     pub total_steps: u64,
     pub segment_length: usize,
     network: &'a Network,
     pub system: Box<dyn IntegrationMethods>,
-    pub timeseries: Timeseries,
+    pub segment_storage: SegmentStorage,
     task_sequence: &'b Vec<Tasks>,
-    save_items: SaveItems,
 }
 
 #[allow(dead_code)]
@@ -52,23 +47,8 @@ impl<'a, 'b> Calculation<'a, 'b> {
         self.total_steps += n as u64;
     }
     pub fn integrate_segment(&mut self) {
-        self.system.integrate_and_keep_segment(&mut self.timeseries);
-        self.total_steps += self.segment_length as u64;
-    }
-    pub fn integrate_segment_save_timeseries(&mut self, epsilon: &f64) {
-        self.system.integrate_and_keep_segment(&mut self.timeseries);
-        self.timeseries.save_simplified_timeseries(epsilon);
-        self.total_steps += self.segment_length as u64;
-    }
-
-    pub fn integrate_segment_save_parametric_curves_2d(
-        &mut self,
-        variable_pairs: &Vec<[usize; 2]>,
-        epsilon: &f64,
-    ) {
-        self.system.integrate_and_keep_segment(&mut self.timeseries);
-        self.timeseries
-            .save_simplified_parametric_curves(variable_pairs, epsilon);
+        self.system
+            .integrate_and_keep_segment(&mut self.segment_storage);
         self.total_steps += self.segment_length as u64;
     }
 
@@ -80,32 +60,15 @@ impl<'a, 'b> Calculation<'a, 'b> {
                     self.n_steps_rk4(time_in_steps);
                 }
                 Tasks::IntegrateSegmentsAndSave { segments, epsilon } => {
-                    match self.save_items.clone() {
-                        SaveItems::Timeseries => {
-                            for _ in 0..*segments {
-                                self.integrate_segment_save_timeseries(&epsilon);
-                            }
-                        }
-                        SaveItems::ParametricCurve2d { variable_pairs } => {
-                            for _ in 0..*segments {
-                                self.integrate_segment_save_parametric_curves_2d(
-                                    &variable_pairs,
-                                    epsilon,
-                                )
-                            }
-                        }
-                        SaveItems::TimeseriesAndParametricCurve2d { variable_pairs } => {
-                            for _ in 0..*segments {
-                                self.system.integrate_and_keep_segment(&mut self.timeseries);
-                                self.timeseries.save_simplified_timeseries(epsilon);
-                                self.timeseries
-                                    .save_simplified_parametric_curves(&variable_pairs, epsilon)
-                            }
-                        }
+                    for _ in 0..*segments {
+                        self.system
+                            .integrate_and_keep_segment(&mut self.segment_storage);
+                        self.segment_storage.simplify_and_save(*epsilon);
+                        self.total_steps += self.segment_length as u64;
                     }
                 }
                 Tasks::PrintTechnicalDetails => {
-                    self.timeseries.display_simplification_ratio();
+                    self.segment_storage.display_simplification_ratio();
                 }
                 _ => {
                     todo!();
@@ -113,9 +76,7 @@ impl<'a, 'b> Calculation<'a, 'b> {
             }
         }
     }
-    // +++++++++++++++++++++++++
-    // +++++++++++++++++++++++++
-    // +++++++++++++++++++++++++
+
     pub fn examples(
         dt: f64,
         network: &'a Network,
@@ -123,18 +84,16 @@ impl<'a, 'b> Calculation<'a, 'b> {
         node_setup: NodeSetup,
         system_type: SystemType,
         task_sequence: &'b Vec<Tasks>,
-        save_items: SaveItems,
     ) -> Self {
-        let system = new_composite_system_of_type(&network, dt, node_setup, system_type);
+        let system = new_composite_system_of_type(network, dt, node_setup, system_type);
 
-        let timeseries = Timeseries::new(
-            dt,
-            network.get_nodes(),
-            system.timeseries_row_len(),
-            segment_length,
-            system.timeseries_curve_names(),
-            &save_items,
-        );
+        let num_nodes = network.get_nodes();
+        let curve_names = system.timeseries_curve_names();
+        let total_columns = num_nodes * system.timeseries_row_len();
+        let output_curves = all_timeseries(num_nodes, curve_names);
+
+        let segment_storage =
+            SegmentStorage::new(dt, total_columns, segment_length, output_curves);
 
         Calculation {
             dt,
@@ -143,9 +102,8 @@ impl<'a, 'b> Calculation<'a, 'b> {
             segment_length,
             network,
             system,
-            timeseries,
+            segment_storage,
             task_sequence,
-            save_items,
         }
     }
 }
@@ -162,7 +120,6 @@ pub enum SystemType {
     LangKobayashi,
     Lorenz,
     MackeyGlass,
-    // MDRE,
     HindmarshRose,
     StuartLandau,
     FitzHughNagumo,
@@ -191,10 +148,6 @@ pub fn new_composite_system_of_type(
                         &network, dt,
                     ))
                 }
-                // SystemType::MDRE => {
-                //     println!("Microscopically-Derived-Rate-Equations");
-                //     Box::new(SingleFeedbackSystem::<mdre::System>::new(&network, dt))
-                // }
                 SystemType::Lorenz => {
                     println!("Lorenz");
                     Box::new(SingleFeedbackSystem::<lorenz::System>::new(&network, dt))
@@ -240,12 +193,6 @@ pub fn new_composite_system_of_type(
                         MultipleIdenticalFeedbackSystems::<mackey_glass::System>::new(&network, dt),
                     )
                 }
-                // SystemType::MDRE => {
-                //     println!("Microscopically-Derived-Rate-Equations");
-                //     Box::new(MultipleIdenticalFeedbackSystems::<mdre::System>::new(
-                //         &network, dt,
-                //     ))
-                // }
                 SystemType::Lorenz => {
                     println!("Lorenz");
                     Box::new(MultipleIdenticalFeedbackSystems::<lorenz::System>::new(
@@ -302,12 +249,6 @@ pub fn new_composite_system_of_type(
                         MultipleDistinctFeedbackSystems::<mackey_glass::System>::new(&network, dt),
                     )
                 }
-                // SystemType::MDRE => {
-                //     println!("Microscopically-Derived-Rate-Equations");
-                //     Box::new(MultipleDistinctFeedbackSystems::<mdre::System>::new(
-                //         &network, dt,
-                //     ))
-                // }
                 SystemType::Lorenz => {
                     println!("Lorenz");
                     Box::new(MultipleDistinctFeedbackSystems::<lorenz::System>::new(

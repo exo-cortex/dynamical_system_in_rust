@@ -1,10 +1,10 @@
-use timeseries::Timeseries;
+use {network_builder::network::Network, segment_storage::SegmentStorage};
+
+use dynamical_systems::dynamical_system::Feedback;
 
 use crate::{
-    dynamical_system::Feedback,
-    history::History,
+    history::{History, WeightFromEdge},
     integration_methods::{self, IntegrationMethods, RungeKuttaDelay},
-    network::Network,
 };
 
 const EQUAL_RINGBUFFERS: bool = false; // make each ringbuffer as long as the longest one needed
@@ -45,6 +45,7 @@ const EQUAL_RINGBUFFERS: bool = false; // make each ringbuffer as long as the lo
 pub struct SingleFeedbackSystem<DynSystemT>
 where
     DynSystemT: Feedback,
+    DynSystemT::WeightT: WeightFromEdge,
 {
     dt: f64,
     pub time: f64,
@@ -56,7 +57,8 @@ where
 #[allow(dead_code)]
 impl<DynSystemT> SingleFeedbackSystem<DynSystemT>
 where
-    DynSystemT: Feedback + 'static,
+    DynSystemT: Feedback,
+    DynSystemT::WeightT: WeightFromEdge,
 {
     pub fn new(network: &Network, dt: f64) -> Self {
         SingleFeedbackSystem {
@@ -77,6 +79,7 @@ where
 impl<DynSystemT> IntegrationMethods for SingleFeedbackSystem<DynSystemT>
 where
     DynSystemT: Feedback,
+    DynSystemT::WeightT: WeightFromEdge,
 {
     fn single_step_rk4(&mut self) {
         let mut keep_for_feedback = RungeKuttaDelay::<DynSystemT::FeedbackT>::default();
@@ -101,9 +104,9 @@ where
     fn keep_state(&self) -> Vec<f64> {
         DynSystemT::keep_state(&self.state)
     }
-    fn integrate_and_keep_segment(&mut self, timeseries: &mut Timeseries) {
-        timeseries.update_time(&self.time);
-        timeseries.segment().iter_mut().for_each(|row| {
+    fn integrate_and_keep_segment(&mut self, segment_storage: &mut SegmentStorage) {
+        segment_storage.update_time(&self.time);
+        segment_storage.segment().iter_mut().for_each(|row| {
             self.single_step_rk4();
             row.iter_mut()
                 .zip(DynSystemT::keep_state(&self.state))
@@ -125,6 +128,7 @@ where
 pub struct MultipleIdenticalFeedbackSystems<DynSystemT>
 where
     DynSystemT: Feedback + 'static,
+    DynSystemT::WeightT: WeightFromEdge,
 {
     dt: f64,
     pub time: f64,
@@ -138,6 +142,7 @@ where
 impl<DynSystemT> MultipleIdenticalFeedbackSystems<DynSystemT>
 where
     DynSystemT: Feedback,
+    DynSystemT::WeightT: WeightFromEdge,
 {
     pub fn new(network: &Network, dt: f64) -> Self {
         MultipleIdenticalFeedbackSystems {
@@ -159,6 +164,7 @@ where
 impl<DynSystemT> IntegrationMethods for MultipleIdenticalFeedbackSystems<DynSystemT>
 where
     DynSystemT: Feedback,
+    DynSystemT::WeightT: WeightFromEdge,
 {
     fn single_step_rk4(&mut self) {
         let mut keep_for_feedback =
@@ -189,19 +195,6 @@ where
         }
     }
 
-    // fn into_str(&self) -> String {
-    //     format!(
-    //         "{}\t{}",
-    //         self.time,
-    //         self.states.iter().fold("".to_string(), |acc, s| format!(
-    //             "{}\t{}",
-    //             acc,
-    //             &s.write_out()
-    //         ))
-    //     )
-    //     .to_owned()
-    // }
-
     fn keep_state(&self) -> Vec<f64> {
         self.states
             .iter()
@@ -209,9 +202,9 @@ where
             .flatten()
             .collect::<Vec<f64>>()
     }
-    fn integrate_and_keep_segment(&mut self, timeseries: &mut Timeseries) {
-        timeseries.update_time(&self.time);
-        timeseries.segment().iter_mut().for_each(|row| {
+    fn integrate_and_keep_segment(&mut self, segment_storage: &mut SegmentStorage) {
+        segment_storage.update_time(&self.time);
+        segment_storage.segment().iter_mut().for_each(|row| {
             self.single_step_rk4();
             row.iter_mut()
                 .zip(self.keep_state())
@@ -235,6 +228,7 @@ where
 pub struct MultipleDistinctFeedbackSystems<DynSystemT>
 where
     DynSystemT: Feedback,
+    DynSystemT::WeightT: WeightFromEdge,
 {
     dt: f64,
     pub time: f64,
@@ -248,6 +242,7 @@ where
 impl<DynSystemT> MultipleDistinctFeedbackSystems<DynSystemT>
 where
     DynSystemT: Feedback + 'static,
+    DynSystemT::WeightT: WeightFromEdge,
 {
     pub fn new(network: &Network, dt: f64) -> Self {
         MultipleDistinctFeedbackSystems {
@@ -269,6 +264,7 @@ where
 impl<DynSystemT> IntegrationMethods for MultipleDistinctFeedbackSystems<DynSystemT>
 where
     DynSystemT: Feedback,
+    DynSystemT::WeightT: WeightFromEdge,
 {
     fn single_step_rk4(&mut self) {
         let mut keep_for_feedback =
@@ -321,9 +317,9 @@ where
             .collect::<Vec<f64>>()
     }
 
-    fn integrate_and_keep_segment(&mut self, timeseries: &mut Timeseries) {
-        timeseries.update_time(&self.time);
-        timeseries.segment().iter_mut().for_each(|row| {
+    fn integrate_and_keep_segment(&mut self, segment_storage: &mut SegmentStorage) {
+        segment_storage.update_time(&self.time);
+        segment_storage.segment().iter_mut().for_each(|row| {
             self.single_step_rk4();
             row.iter_mut()
                 .zip(self.keep_state())

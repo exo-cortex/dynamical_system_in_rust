@@ -1,27 +1,9 @@
-use crate::dynamical_system::{AsData, DynamicalSystem, Feedback, WeightComplex};
+use crate::dynamical_system::{AsData, DynamicalSystem, Feedback, UncoupledSystem, WeightComplex};
 use derive_more::{Add, AddAssign, Div, Mul, MulAssign};
 use num_complex::Complex;
 use std::fmt;
 
 // const DOMAIN_NAME: &'static str = "lang_kobayashi";
-
-// impl DynamicalSystem for System {
-//     type StateT = State;
-//     type ModelT = ModelT;
-//     type KeepT = Vec<f64>;
-//     fn f(input_state: &Self::StateT, model: &Self::ModelT) -> Self::StateT {
-//         Self::StateT {
-//             e: Complex::new(1.0, model.alpha) * input_state.n * input_state.e,
-//             n: (1.0 / model.t_lk)
-//                 * (model.pump
-//                     - input_state.n
-//                     - (2.0 * input_state.n + 1.0) * input_state.e.norm_sqr()),
-//         }
-//     }
-//     fn collect(state: &Self::StateT) -> Self::KeepT {
-//         vec![state.e.norm_sqr(), state.n]
-//     }
-// }
 
 #[allow(dead_code)]
 pub struct System {}
@@ -33,6 +15,26 @@ impl DynamicalSystem for System {
     }
     fn keep_state_names() -> &'static [&'static str] {
         &["e_norm", "n"]
+    }
+}
+
+impl UncoupledSystem for System {
+    fn f(
+        state: &Self::StateT,
+        model: &Self::ModelT,
+        _: &f64, // maybe different ?
+    ) -> Self::StateT {
+        Self::StateT {
+            e: Complex::new(1.0, model.alpha) * state.n * state.e,
+            n: (1.0 / model.t_lk)
+                * (model.pump - state.n - (2.0 * state.n + 1.0) * state.e.norm_sqr()),
+        }
+    }
+    fn keep_state(state: &Self::StateT) -> Vec<f64> {
+        vec![state.e.re, state.e.im, state.n]
+    }
+    fn keep_state_names() -> &'static [&'static str] {
+        &["e_real", "e_imag", "n"]
     }
 }
 
@@ -111,15 +113,21 @@ impl Default for Model {
 //     each AsOutput impl has to have a different N
 // M - the size of the output array (better fixed-sized array for compilation)
 struct AsA<'a>(&'a State);
-impl<'a> AsData<2> for AsA<'a> {
-    fn get_data(&self) -> [f64; 2] {
-        [self.0.e.norm_sqr(), self.0.n]
+impl<'a> AsData for AsA<'a> {
+    fn get_data_descriptions() -> Vec<&'static str> {
+        vec!["e_norm_squared", "n"]
+    }
+    fn get_data(&self) -> Vec<f64> {
+        vec![self.0.e.norm_sqr(), self.0.n]
     }
 }
 
 struct AsB<'a>(&'a State);
-impl<'a> AsData<3> for AsB<'a> {
-    fn get_data(&self) -> [f64; 3] {
-        [self.0.e.re, self.0.e.im, self.0.n]
+impl<'a> AsData for AsB<'a> {
+    fn get_data_descriptions() -> Vec<&'static str> {
+        vec!["e_re", "e_im", "n"]
+    }
+    fn get_data(&self) -> Vec<f64> {
+        vec![self.0.e.re, self.0.e.im, self.0.n]
     }
 }
